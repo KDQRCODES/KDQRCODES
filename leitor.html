@@ -8,29 +8,6 @@
 </head>
 <body>
   <h1>Leitor de QR Code</h1>
-
-  <video id="preview" width="100%" height="auto"></video>
-  <p id="resultado"></p>
-
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
-  <script>
-    const scanner = new Html5Qrcode("preview");
-    const config = { fps: 10, qrbox: 250 };
-
-    Html5Qrcode.getCameras().then(cameras => {
-      if (cameras && cameras.length) {
-        scanner.start(
-          { facingMode: "environment" },
-          config,
-          qrCodeMessage => {
-            document.getElementById("resultado").innerText = `QR Code: ${qrCodeMessage}`;
-            scanner.stop();
-          }
-        );
-      }
-    }).catch(err => {
-      document.getElementById("resultado").innerText = `Erro: ${err}`;
-    });
-  </script>
+  <p>Essa parte ainda será conectada ao sistema de câmera para leitura de QR Code.</p>
 </body>
 </html>
