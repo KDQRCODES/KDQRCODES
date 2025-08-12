@@ -2,12 +2,185 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel de Check-in</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel de Check-in - Eventos</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: auto; }
+    #loginForm, #eventsPanel, #eventDetails { display: none; }
+    #error { color: red; }
+    button { padding: 8px 12px; margin-top: 10px; }
+    ul { padding-left: 20px; }
+    li { margin: 5px 0; cursor: pointer; color: blue; text-decoration: underline; }
+  </style>
 </head>
 <body>
-  <h1>Painel de Check-in</h1>
-  <p>Essa parte ainda será conectada ao Firebase para mostrar os nomes dos convidados e os horários de entrada.</p>
+
+<h1>Painel de Check-in</h1>
+
+<div id="loginForm">
+  <h2>Login</h2>
+  <input type="email" id="email" placeholder="Email" /><br /><br />
+  <input type="password" id="password" placeholder="Senha" /><br /><br />
+  <button id="btnLogin">Entrar</button>
+  <div id="error"></div>
+</div>
+
+<div id="eventsPanel">
+  <button id="btnLogout">Sair</button>
+  <h2>Seus Eventos</h2>
+
+  <ul id="eventsList"></ul>
+
+  <h3>Criar Novo Evento</h3>
+  <input type="text" id="newEventName" placeholder="Nome do Evento" />
+  <button id="btnCreateEvent">Criar Evento</button>
+  <div id="eventsError"></div>
+</div>
+
+<div id="eventDetails">
+  <button id="btnBackToEvents">← Voltar para eventos</button>
+  <h2 id="eventTitle"></h2>
+  <p>Ainda vamos implementar essa parte.</p>
+</div>
+
+<script>
+  // Config Firebase — substitua com seu firebaseConfig
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
+    authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
+    projectId: "kd-qr-codes-checkin-eventos",
+    storageBucket: "kd-qr-codes-checkin-eventos.firebasestorage.app",
+    messagingSenderId: "9325387244",
+    appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  const loginForm = document.getElementById('loginForm');
+  const eventsPanel = document.getElementById('eventsPanel');
+  const eventDetails = document.getElementById('eventDetails');
+
+  const errorDiv = document.getElementById('error');
+  const eventsErrorDiv = document.getElementById('eventsError');
+
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const btnLogin = document.getElementById('btnLogin');
+  const btnLogout = document.getElementById('btnLogout');
+
+  const eventsList = document.getElementById('eventsList');
+  const newEventNameInput = document.getElementById('newEventName');
+  const btnCreateEvent = document.getElementById('btnCreateEvent');
+
+  const btnBackToEvents = document.getElementById('btnBackToEvents');
+  const eventTitle = document.getElementById('eventTitle');
+
+  let currentEventId = null;
+
+  function showLogin() {
+    loginForm.style.display = 'block';
+    eventsPanel.style.display = 'none';
+    eventDetails.style.display = 'none';
+  }
+
+  function showEventsPanel() {
+    loginForm.style.display = 'none';
+    eventsPanel.style.display = 'block';
+    eventDetails.style.display = 'none';
+  }
+
+  function showEventDetails() {
+    loginForm.style.display = 'none';
+    eventsPanel.style.display = 'none';
+    eventDetails.style.display = 'block';
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      showEventsPanel();
+      loadEvents();
+    } else {
+      showLogin();
+    }
+  });
+
+  btnLogin.addEventListener('click', () => {
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    errorDiv.textContent = '';
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(err => {
+        errorDiv.textContent = err.message;
+      });
+  });
+
+  btnLogout.addEventListener('click', () => {
+    auth.signOut();
+  });
+
+  btnCreateEvent.addEventListener('click', () => {
+    const nomeEvento = newEventNameInput.value.trim();
+    eventsErrorDiv.textContent = '';
+    if (!nomeEvento) {
+      eventsErrorDiv.textContent = 'Informe um nome para o evento.';
+      return;
+    }
+    db.collection('eventos').add({
+      nome: nomeEvento,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      criadoPor: auth.currentUser.uid
+    })
+    .then(() => {
+      newEventNameInput.value = '';
+      loadEvents();
+    })
+    .catch(err => {
+      eventsErrorDiv.textContent = 'Erro ao criar evento: ' + err.message;
+    });
+  });
+
+  function loadEvents() {
+    eventsList.innerHTML = '';
+    db.collection('eventos')
+      .where('criadoPor', '==', auth.currentUser.uid)
+      .orderBy('criadoEm', 'desc')
+      .get()
+      .then(snapshot => {
+        if(snapshot.empty) {
+          eventsList.innerHTML = '<li>Nenhum evento criado ainda.</li>';
+          return;
+        }
+        snapshot.forEach(doc => {
+          const ev = doc.data();
+          const li = document.createElement('li');
+          li.textContent = ev.nome;
+          li.dataset.id = doc.id;
+          li.addEventListener('click', () => {
+            currentEventId = doc.id;
+            eventTitle.textContent = ev.nome;
+            showEventDetails();
+          });
+          eventsList.appendChild(li);
+        });
+      })
+      .catch(err => {
+        eventsErrorDiv.textContent = 'Erro ao carregar eventos: ' + err.message;
+      });
+  }
+
+  btnBackToEvents.addEventListener('click', () => {
+    currentEventId = null;
+    showEventsPanel();
+    loadEvents();
+  });
+
+</script>
 </body>
 </html>
