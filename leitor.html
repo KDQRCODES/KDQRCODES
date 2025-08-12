@@ -20,15 +20,21 @@
       font-weight: bold;
       color: green;
     }
+    select {
+      margin-bottom: 10px;
+      padding: 5px;
+    }
   </style>
 </head>
 <body>
   <h1>Leitor de QR Code</h1>
+  <select id="cameraSelect"></select>
   <div id="reader"></div>
   <div id="result"></div>
 
   <script>
     const resultContainer = document.getElementById('result');
+    const cameraSelect = document.getElementById('cameraSelect');
     const html5QrCode = new Html5Qrcode("reader");
     const config = { fps: 10, qrbox: 250 };
 
@@ -38,24 +44,31 @@
       });
     };
 
-    // Primeiro: pede permissão e inicia com qualquer câmera
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(() => {
-        // Depois de concedida a permissão, obtemos as câmeras
-        Html5Qrcode.getCameras().then(devices => {
-          if (devices.length > 1) {
-            // Escolhe a última (geralmente traseira)
-            const backCamera = devices[devices.length - 1];
-            html5QrCode.start(backCamera.id, config, qrCodeSuccessCallback);
-          } else {
-            // Só tem uma câmera
-            html5QrCode.start(devices[0].id, config, qrCodeSuccessCallback);
-          }
-        });
-      })
-      .catch(err => {
-        resultContainer.innerText = "Erro ao acessar câmera: " + err;
+    function startCamera(cameraId) {
+      html5QrCode.stop().catch(() => {}).finally(() => {
+        html5QrCode.start(cameraId, config, qrCodeSuccessCallback);
       });
+    }
+
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices.length) {
+        devices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.id;
+          option.text = device.label || `Câmera ${index + 1}`;
+          cameraSelect.appendChild(option);
+        });
+        // Inicia com a primeira câmera
+        startCamera(devices[0].id);
+
+        // Troca a câmera ao mudar a seleção
+        cameraSelect.addEventListener('change', () => {
+          startCamera(cameraSelect.value);
+        });
+      }
+    }).catch(err => {
+      resultContainer.innerText = "Erro ao acessar a câmera: " + err;
+    });
   </script>
 </body>
 </html>
