@@ -3,44 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Teste de Câmera</title>
+  <title>Teste Câmera Básico</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-    }
-    video {
-      width: 100%;
-      max-width: 400px;
-      height: auto;
-      border: 2px solid #333;
-      border-radius: 8px;
-      background: #000;
-    }
-    #errorMsg {
-      color: red;
-      margin-top: 20px;
-      font-weight: bold;
-    }
+    body { font-family: Arial; text-align: center; padding: 2em; }
+    video { max-width: 100%; border: 2px solid black; border-radius: 8px; }
+    #error { color: red; margin-top: 1em; }
   </style>
 </head>
 <body>
   <h1>Teste de Câmera</h1>
   <video id="video" autoplay playsinline></video>
-  <div id="errorMsg"></div>
+  <div id="error"></div>
 
   <script>
     const video = document.getElementById('video');
-    const errorMsg = document.getElementById('errorMsg');
+    const errorDiv = document.getElementById('error');
 
-    // Solicita permissão e acessa a câmera
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         video.srcObject = stream;
-      } catch (err) {
-        errorMsg.textContent = 'Erro ao acessar a câmera: ' + err.message;
+      } catch (e) {
+        errorDiv.textContent = 'Erro ao acessar câmera: ' + e.message;
       }
     }
 
