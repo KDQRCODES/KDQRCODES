@@ -27,9 +27,9 @@
 </head>
 <body>
   <h1>Leitor de QR Code</h1>
-  
+
   <select id="camera-selection"></select>
-  
+
   <div id="reader"></div>
   <div id="result"></div>
 
@@ -38,22 +38,50 @@
     const cameraSelection = document.getElementById('camera-selection');
     const html5QrCode = new Html5Qrcode("reader");
 
-    let currentCameraId;
+    let currentCameraId = null;
+    let scanning = false;
 
-    function startScanner(cameraId) {
-      if (html5QrCode.isScanning) {
-        html5QrCode.stop().then(() => {
-          startScanner(cameraId);
-        });
-        return;
-      }
-      currentCameraId = cameraId;
-      html5QrCode.start(
-        cameraId,
-        { fps: 10, qrbox: 250 },
-        (decodedText, decodedResult) => {
-          html5QrCode.stop();
-          resultContainer.innerText = "Código lido: " + decodedText;
+    async function startScanner(cameraId) {
+      try {
+        if (scanning) {
+          await html5QrCode.stop();
+          scanning = false;
         }
-      ).catch(err => {
-        re
+        currentCameraId = cameraId;
+        await html5QrCode.start(
+          cameraId,
+          { fps: 10, qrbox: 250 },
+          (decodedText, decodedResult) => {
+            html5QrCode.stop();
+            scanning = false;
+            resultContainer.innerText = "Código lido: " + decodedText;
+          }
+        );
+        scanning = true;
+      } catch (err) {
+        resultContainer.innerText = "Erro ao iniciar a câmera: " + err;
+      }
+    }
+
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        devices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.id;
+          option.text = device.label || `Câmera ${index + 1}`;
+          cameraSelection.appendChild(option);
+        });
+        cameraSelection.addEventListener('change', () => {
+          startScanner(cameraSelection.value);
+        });
+        // Inicia com a primeira câmera
+        startScanner(devices[0].id);
+      } else {
+        resultContainer.innerText = "Nenhuma câmera encontrada.";
+      }
+    }).catch(err => {
+      resultContainer.innerText = "Erro ao acessar as câmeras: " + err;
+    });
+  </script>
+</body>
+</html>
