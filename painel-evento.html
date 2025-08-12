@@ -7,35 +7,47 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 
   <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
-    h1 { text-align: center; }
-    #convidadosList li { margin-bottom: 8px; }
-    .presente { color: green; font-weight: bold; }
-    .ausente { color: red; font-weight: bold; }
-    #qrCodeCanvas { margin-top: 10px; }
-    button { margin-left: 10px; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+    h2 { margin-bottom: 10px; }
+    #gerador, #leitor, #checkins { margin-top: 30px; }
+    button { padding: 6px 10px; margin-top: 10px; }
+    input, textarea { width: 100%; padding: 8px; margin: 6px 0; box-sizing: border-box; }
+    ul { padding-left: 20px; }
+    li { margin: 5px 0; }
+    .qr-img { width: 120px; height: 120px; margin: 5px; border: 1px solid #ccc; }
+    .checkin-item { border-bottom: 1px solid #ccc; padding: 5px 0; }
   </style>
 </head>
 <body>
 
-<h1 id="nomeEvento">Evento</h1>
+<h1>Painel do Evento</h1>
 
-<h2>Convidados</h2>
-<ul id="convidadosList"></ul>
+<div id="gerador">
+  <h2>Gerador de QR Codes (Nomes separados por linha)</h2>
+  <textarea id="nomesInput" rows="5" placeholder="Digite os nomes dos convidados, um por linha"></textarea><br />
+  <button id="btnGerar">Gerar QR Codes</button>
+  <div id="qrcodes"></div>
+</div>
 
-<h3>Adicionar convidado</h3>
-<input type="text" id="nomeConvidado" placeholder="Nome do convidado" />
-<button id="btnAddConvidado">Adicionar</button>
-<div id="msgErro" style="color:red;"></div>
+<div id="leitor">
+  <h2>Leitor de QR Code</h2>
+  <div id="reader" style="width: 300px; margin-bottom: 10px;"></div>
+  <div id="resultadoLeitura"></div>
+  <button id="btnConfirmarEntrada" style="display:none;">Confirmar Entrada</button>
+</div>
 
-<h3>QR Code Gerado</h3>
-<div id="qrCodeArea"></div>
+<div id="checkins">
+  <h2>Entradas Confirmadas</h2>
+  <ul id="checkinsList"></ul>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 
 <script>
-  // Config Firebase (coloque o seu config aqui)
+  // Firebase config (mesmo do painel principal)
   const firebaseConfig = {
     apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
     authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
@@ -48,111 +60,170 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  // Recebe o ID do evento pela query string ?evento=ID
+  // Pega o eventId da URL
   const urlParams = new URLSearchParams(window.location.search);
-  const eventoId = urlParams.get('evento');
+  const eventId = urlParams.get('eventId');
 
-  if (!eventoId) {
-    alert('ID do evento não encontrado!');
-    throw new Error('ID do evento não encontrado');
-  }
+  const nomesInput = document.getElementById('nomesInput');
+  const btnGerar = document.getElementById('btnGerar');
+  const qrcodesDiv = document.getElementById('qrcodes');
 
-  const nomeEventoEl = document.getElementById('nomeEvento');
-  const convidadosList = document.getElementById('convidadosList');
-  const nomeConvidadoInput = document.getElementById('nomeConvidado');
-  const btnAddConvidado = document.getElementById('btnAddConvidado');
-  const msgErro = document.getElementById('msgErro');
-  const qrCodeArea = document.getElementById('qrCodeArea');
+  const readerDiv = document.getElementById('reader');
+  const resultadoLeitura = document.getElementById('resultadoLeitura');
+  const btnConfirmarEntrada = document.getElementById('btnConfirmarEntrada');
 
-  // Carrega nome do evento
-  db.collection('eventos').doc(eventoId).get().then(doc => {
-    if (doc.exists) {
-      nomeEventoEl.textContent = doc.data().nome;
-      carregarConvidados();
-    } else {
-      alert('Evento não encontrado');
+  const checkinsList = document.getElementById('checkinsList');
+
+  let html5QrCode;
+  let ultimoCodigoLido = null;
+
+  // Gerar QR Codes para cada nome e salvar no Firestore no evento
+  btnGerar.addEventListener('click', async () => {
+    const nomes = nomesInput.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+    if (nomes.length === 0) {
+      alert('Digite pelo menos um nome.');
+      return;
+    }
+    qrcodesDiv.innerHTML = 'Gerando...';
+    // Vamos gerar QR codes no formato JSON simples com nome + evento
+    qrcodesDiv.innerHTML = '';
+
+    for (const nome of nomes) {
+      const codigo = JSON.stringify({ eventId, nome });
+      // Salva no Firestore se ainda não existir esse nome para evitar duplicados
+      const query = await db.collection('eventos').doc(eventId).collection('convidados')
+        .where('nome', '==', nome).get();
+
+      if (query.empty) {
+        await db.collection('eventos').doc(eventId).collection('convidados').add({
+          nome,
+          qrCode: codigo,
+          entrou: false,
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      // Gera o QR code visual
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, codigo, { width: 120 });
+      const div = document.createElement('div');
+      div.style.display = 'inline-block';
+      div.style.margin = '10px';
+      div.style.textAlign = 'center';
+      div.appendChild(canvas);
+      const p = document.createElement('p');
+      p.textContent = nome;
+      div.appendChild(p);
+      qrcodesDiv.appendChild(div);
     }
   });
 
-  // Carregar convidados
-  function carregarConvidados() {
-    convidadosList.innerHTML = '';
-    db.collection('eventos').doc(eventoId).collection('convidados')
-      .orderBy('nome')
-      .get()
-      .then(snapshot => {
-        if (snapshot.empty) {
-          convidadosList.innerHTML = '<li>Nenhum convidado adicionado.</li>';
-          return;
-        }
-
-        snapshot.forEach(doc => {
-          const c = doc.data();
-          const li = document.createElement('li');
-          li.textContent = c.nome + ' ';
-
-          const statusSpan = document.createElement('span');
-          statusSpan.textContent = c.presente ? 'Presente' : 'Ausente';
-          statusSpan.className = c.presente ? 'presente' : 'ausente';
-          li.appendChild(statusSpan);
-
-          // Botão para gerar QR code
-          const btnQr = document.createElement('button');
-          btnQr.textContent = 'Gerar QR';
-          btnQr.onclick = () => gerarQRCode(doc.id, c.nome);
-          li.appendChild(btnQr);
-
-          convidadosList.appendChild(li);
-        });
-      });
+  // Inicializa o leitor de QR Code
+  function startLeitor(cameraId) {
+    if (html5QrCode) {
+      html5QrCode.stop().catch(() => {});
+    }
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: 250 };
+    html5QrCode.start(
+      cameraId,
+      config,
+      (decodedText, decodedResult) => {
+        resultadoLeitura.textContent = 'Código lido: ' + decodedText;
+        ultimoCodigoLido = decodedText;
+        btnConfirmarEntrada.style.display = 'inline-block';
+        html5QrCode.stop();
+      },
+      (error) => {
+        // erros pequenos podem ser ignorados
+      }
+    ).catch(err => {
+      resultadoLeitura.textContent = 'Erro ao iniciar leitor: ' + err;
+    });
   }
 
-  // Adicionar convidado
-  btnAddConvidado.onclick = () => {
-    const nome = nomeConvidadoInput.value.trim();
-    msgErro.textContent = '';
-    if (!nome) {
-      msgErro.textContent = 'Informe o nome do convidado.';
+  // Pega as câmeras e inicia com a traseira (última da lista)
+  Html5Qrcode.getCameras().then(devices => {
+    if (devices && devices.length) {
+      const cameraId = devices[devices.length - 1].id;
+      startLeitor(cameraId);
+    } else {
+      resultadoLeitura.textContent = 'Nenhuma câmera encontrada.';
+    }
+  }).catch(err => {
+    resultadoLeitura.textContent = 'Erro ao acessar câmeras: ' + err;
+  });
+
+  btnConfirmarEntrada.addEventListener('click', async () => {
+    if (!ultimoCodigoLido) {
+      alert('Nenhum código lido para confirmar.');
+      return;
+    }
+    let dados;
+    try {
+      dados = JSON.parse(ultimoCodigoLido);
+    } catch {
+      alert('Código QR inválido.');
+      return;
+    }
+    if (dados.eventId !== eventId) {
+      alert('QR Code não pertence a este evento.');
       return;
     }
 
-    // Verificar se já existe convidado com mesmo nome no evento
-    db.collection('eventos').doc(eventoId).collection('convidados')
-      .where('nome', '==', nome)
-      .get()
-      .then(snapshot => {
-        if (!snapshot.empty) {
-          msgErro.textContent = 'Convidado já existe.';
-          return;
-        }
+    // Procura o convidado e confirma entrada
+    const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
+    const query = await convidadosRef.where('nome', '==', dados.nome).get();
 
-        // Adiciona convidado
-        db.collection('eventos').doc(eventoId).collection('convidados').add({
-          nome,
-          presente: false,
-          entradaEm: null
-        }).then(() => {
-          nomeConvidadoInput.value = '';
-          carregarConvidados();
-        });
-      });
-  };
+    if (query.empty) {
+      alert('Convidado não encontrado.');
+      return;
+    }
 
-  // Gerar QR Code para convidado
-  function gerarQRCode(convidadoId, nome) {
-    qrCodeArea.innerHTML = '';
-    const data = JSON.stringify({ eventoId, convidadoId });
-    QRCode.toCanvas(data, { width: 200 }, function (error, canvas) {
-      if (error) {
-        alert('Erro ao gerar QR Code: ' + error);
-        return;
-      }
-      qrCodeArea.appendChild(canvas);
-      const label = document.createElement('p');
-      label.textContent = `QR do(a) ${nome}`;
-      qrCodeArea.appendChild(label);
+    const doc = query.docs[0];
+    if (doc.data().entrou) {
+      alert('Presença já confirmada para este convidado.');
+      return;
+    }
+
+    await convidadosRef.doc(doc.id).update({
+      entrou: true,
+      horarioEntrada: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    alert(`Entrada confirmada para ${dados.nome}!`);
+    resultadoLeitura.textContent = '';
+    btnConfirmarEntrada.style.display = 'none';
+    ultimoCodigoLido = null;
+    loadCheckins();
+    // reinicia o leitor
+    startLeitor(devices[devices.length - 1].id);
+  });
+
+  // Lista os convidados que já entraram
+  async function loadCheckins() {
+    checkinsList.innerHTML = '';
+    const convidados = await db.collection('eventos').doc(eventId).collection('convidados')
+      .where('entrou', '==', true)
+      .orderBy('horarioEntrada', 'desc')
+      .get();
+
+    if (convidados.empty) {
+      checkinsList.innerHTML = '<li>Nenhuma entrada confirmada ainda.</li>';
+      return;
+    }
+
+    convidados.forEach(doc => {
+      const data = doc.data();
+      const li = document.createElement('li');
+      const hora = data.horarioEntrada ? data.horarioEntrada.toDate().toLocaleString() : '';
+      li.classList.add('checkin-item');
+      li.textContent = `${data.nome} - Entrada às ${hora}`;
+      checkinsList.appendChild(li);
     });
   }
+
+  loadCheckins();
 </script>
 
 </body>
