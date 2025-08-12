@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Leitor de QR Code</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
@@ -20,55 +20,40 @@
       font-weight: bold;
       color: green;
     }
-    select {
-      margin-bottom: 10px;
-      padding: 5px;
+    #camera-selection {
+      margin-bottom: 15px;
     }
   </style>
 </head>
 <body>
   <h1>Leitor de QR Code</h1>
-  <select id="cameraSelect"></select>
+  
+  <select id="camera-selection"></select>
+  
   <div id="reader"></div>
   <div id="result"></div>
 
   <script>
     const resultContainer = document.getElementById('result');
-    const cameraSelect = document.getElementById('cameraSelect');
+    const cameraSelection = document.getElementById('camera-selection');
     const html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: 250 };
 
-    const qrCodeSuccessCallback = (decodedText) => {
-      html5QrCode.stop().then(() => {
-        resultContainer.innerText = "Código lido: " + decodedText;
-      });
-    };
+    let currentCameraId;
 
-    function startCamera(cameraId) {
-      html5QrCode.stop().catch(() => {}).finally(() => {
-        html5QrCode.start(cameraId, config, qrCodeSuccessCallback);
-      });
-    }
-
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices.length) {
-        devices.forEach((device, index) => {
-          const option = document.createElement('option');
-          option.value = device.id;
-          option.text = device.label || `Câmera ${index + 1}`;
-          cameraSelect.appendChild(option);
+    function startScanner(cameraId) {
+      if (html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+          startScanner(cameraId);
         });
-        // Inicia com a primeira câmera
-        startCamera(devices[0].id);
-
-        // Troca a câmera ao mudar a seleção
-        cameraSelect.addEventListener('change', () => {
-          startCamera(cameraSelect.value);
-        });
+        return;
       }
-    }).catch(err => {
-      resultContainer.innerText = "Erro ao acessar a câmera: " + err;
-    });
-  </script>
-</body>
-</html>
+      currentCameraId = cameraId;
+      html5QrCode.start(
+        cameraId,
+        { fps: 10, qrbox: 250 },
+        (decodedText, decodedResult) => {
+          html5QrCode.stop();
+          resultContainer.innerText = "Código lido: " + decodedText;
+        }
+      ).catch(err => {
+        re
