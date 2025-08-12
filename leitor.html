@@ -32,10 +32,8 @@
     const html5QrCode = new Html5Qrcode("reader");
 
     const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-      // Para evitar leitura múltipla
       html5QrCode.stop().then(() => {
         resultContainer.innerText = "Código lido: " + decodedText;
-        // Aqui você pode redirecionar ou fazer o que quiser com o código lido
       });
     };
 
