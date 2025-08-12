@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel do Evento</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    h1 { text-align: center; }
+    #convidadosList li { margin-bottom: 8px; }
+    .presente { color: green; font-weight: bold; }
+    .ausente { color: red; font-weight: bold; }
+    #qrCodeCanvas { margin-top: 10px; }
+    button { margin-left: 10px; }
+  </style>
+</head>
+<body>
+
+<h1 id="nomeEvento">Evento</h1>
+
+<h2>Convidados</h2>
+<ul id="convidadosList"></ul>
+
+<h3>Adicionar convidado</h3>
+<input type="text" id="nomeConvidado" placeholder="Nome do convidado" />
+<button id="btnAddConvidado">Adicionar</button>
+<div id="msgErro" style="color:red;"></div>
+
+<h3>QR Code Gerado</h3>
+<div id="qrCodeArea"></div>
+
+<script>
+  // Config Firebase (coloque o seu config aqui)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
+    authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
+    projectId: "kd-qr-codes-checkin-eventos",
+    storageBucket: "kd-qr-codes-checkin-eventos.firebasestorage.app",
+    messagingSenderId: "9325387244",
+    appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Recebe o ID do evento pela query string ?evento=ID
+  const urlParams = new URLSearchParams(window.location.search);
+  const eventoId = urlParams.get('evento');
+
+  if (!eventoId) {
+    alert('ID do evento não encontrado!');
+    throw new Error('ID do evento não encontrado');
+  }
+
+  const nomeEventoEl = document.getElementById('nomeEvento');
+  const convidadosList = document.getElementById('convidadosList');
+  const nomeConvidadoInput = document.getElementById('nomeConvidado');
+  const btnAddConvidado = document.getElementById('btnAddConvidado');
+  const msgErro = document.getElementById('msgErro');
+  const qrCodeArea = document.getElementById('qrCodeArea');
+
+  // Carrega nome do evento
+  db.collection('eventos').doc(eventoId).get().then(doc => {
+    if (doc.exists) {
+      nomeEventoEl.textContent = doc.data().nome;
+      carregarConvidados();
+    } else {
+      alert('Evento não encontrado');
+    }
+  });
+
+  // Carregar convidados
+  function carregarConvidados() {
+    convidadosList.innerHTML = '';
+    db.collection('eventos').doc(eventoId).collection('convidados')
+      .orderBy('nome')
+      .get()
+      .then(snapshot => {
+        if (snapshot.empty) {
+          convidadosList.innerHTML = '<li>Nenhum convidado adicionado.</li>';
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const c = doc.data();
+          const li = document.createElement('li');
+          li.textContent = c.nome + ' ';
+
+          const statusSpan = document.createElement('span');
+          statusSpan.textContent = c.presente ? 'Presente' : 'Ausente';
+          statusSpan.className = c.presente ? 'presente' : 'ausente';
+          li.appendChild(statusSpan);
+
+          // Botão para gerar QR code
+          const btnQr = document.createElement('button');
+          btnQr.textContent = 'Gerar QR';
+          btnQr.onclick = () => gerarQRCode(doc.id, c.nome);
+          li.appendChild(btnQr);
+
+          convidadosList.appendChild(li);
+        });
+      });
+  }
+
+  // Adicionar convidado
+  btnAddConvidado.onclick = () => {
+    const nome = nomeConvidadoInput.value.trim();
+    msgErro.textContent = '';
+    if (!nome) {
+      msgErro.textContent = 'Informe o nome do convidado.';
+      return;
+    }
+
+    // Verificar se já existe convidado com mesmo nome no evento
+    db.collection('eventos').doc(eventoId).collection('convidados')
+      .where('nome', '==', nome)
+      .get()
+      .then(snapshot => {
+        if (!snapshot.empty) {
+          msgErro.textContent = 'Convidado já existe.';
+          return;
+        }
+
+        // Adiciona convidado
+        db.collection('eventos').doc(eventoId).collection('convidados').add({
+          nome,
+          presente: false,
+          entradaEm: null
+        }).then(() => {
+          nomeConvidadoInput.value = '';
+          carregarConvidados();
+        });
+      });
+  };
+
+  // Gerar QR Code para convidado
+  function gerarQRCode(convidadoId, nome) {
+    qrCodeArea.innerHTML = '';
+    const data = JSON.stringify({ eventoId, convidadoId });
+    QRCode.toCanvas(data, { width: 200 }, function (error, canvas) {
+      if (error) {
+        alert('Erro ao gerar QR Code: ' + error);
+        return;
+      }
+      qrCodeArea.appendChild(canvas);
+      const label = document.createElement('p');
+      label.textContent = `QR do(a) ${nome}`;
+      qrCodeArea.appendChild(label);
+    });
+  }
+</script>
+
+</body>
+</html>
