@@ -3,32 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Teste Câmera Básico</title>
+  <title>Leitor de QR Code</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family: Arial; text-align: center; padding: 2em; }
-    video { max-width: 100%; border: 2px solid black; border-radius: 8px; }
-    #error { color: red; margin-top: 1em; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    #cameraSelection {
+      margin-bottom: 20px;
+    }
+    #reader {
+      width: 300px;
+      margin: auto;
+    }
+    #result {
+      margin-top: 20px;
+      font-weight: bold;
+      color: green;
+      min-height: 30px;
+    }
+    #errorMsg {
+      color: red;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>Teste de Câmera</h1>
-  <video id="video" autoplay playsinline></video>
-  <div id="error"></div>
+  <h1>Leitor de QR Code</h1>
+
+  <select id="cameraSelection"></select>
+
+  <div id="reader"></div>
+  <div id="result"></div>
+  <div id="errorMsg"></div>
 
   <script>
-    const video = document.getElementById('video');
-    const errorDiv = document.getElementById('error');
+    const cameraSelection = document.getElementById('cameraSelection');
+    const resultContainer = document.getElementById('result');
+    const errorMsg = document.getElementById('errorMsg');
+    let html5QrCode;
+    let currentCameraId;
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        video.srcObject = stream;
-      } catch (e) {
-        errorDiv.textContent = 'Erro ao acessar câmera: ' + e.message;
+    function startScanner(cameraId) {
+      if (html5QrCode) {
+        html5QrCode.stop().catch(() => {}); // tenta parar o scanner anterior, mas ignora erro
       }
+
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 10, qrbox: 250 };
+
+      html5QrCode.start(
+        cameraId,
+        config,
+        (decodedText, decodedResult) => {
+          html5QrCode.stop();
+          resultContainer.innerText = "Código lido: " + decodedText;
+        },
+        (errorMessage) => {
+          // Pode mostrar erros pequenos se quiser
+          // console.log(`Erro de leitura: ${errorMessage}`);
+        }
+      ).catch(err => {
+        errorMsg.innerText = "Erro ao iniciar scanner: " + err;
+      });
     }
 
-    startCamera();
+    // Carrega as câmeras e cria as opções do select
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        devices.forEach(device => {
+          const option = document.createElement('option');
+          option.value = device.id;
+          option.text = device.label || `Câmera ${cameraSelection.length + 1}`;
+          cameraSelection.appendChild(option);
+        });
+
+        // Seleciona a última câmera (geralmente a traseira)
+        cameraSelection.selectedIndex = devices.length - 1;
+        currentCameraId = cameraSelection.value;
+        startScanner(currentCameraId);
+      } else {
+        errorMsg.innerText = "Nenhuma câmera encontrada.";
+      }
+    }).catch(err => {
+      errorMsg.innerText = "Erro ao acessar câmeras: " + err;
+    });
+
+    // Troca de câmera pelo select
+    cameraSelection.addEventListener('change', (event) => {
+      currentCameraId = event.target.value;
+      resultContainer.innerText = "";
+      errorMsg.innerText = "";
+      startScanner(currentCameraId);
+    });
   </script>
 </body>
 </html>
