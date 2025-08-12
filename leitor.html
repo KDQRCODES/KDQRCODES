@@ -30,27 +30,32 @@
   <script>
     const resultContainer = document.getElementById('result');
     const html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: 250 };
 
-    const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+    const qrCodeSuccessCallback = (decodedText) => {
       html5QrCode.stop().then(() => {
         resultContainer.innerText = "Código lido: " + decodedText;
       });
     };
 
-    const config = { fps: 10, qrbox: 250 };
-
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        // Tenta encontrar a câmera traseira
-        let backCamera = devices.find(device => device.label.toLowerCase().includes('back')) 
-                        || devices.find(device => device.label.toLowerCase().includes('traseira')) 
-                        || devices[devices.length - 1]; // Se não achar, pega a última
-
-        html5QrCode.start(backCamera.id, config, qrCodeSuccessCallback);
-      }
-    }).catch(err => {
-      resultContainer.innerText = "Erro ao acessar a câmera: " + err;
-    });
+    // Primeiro: pede permissão e inicia com qualquer câmera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(() => {
+        // Depois de concedida a permissão, obtemos as câmeras
+        Html5Qrcode.getCameras().then(devices => {
+          if (devices.length > 1) {
+            // Escolhe a última (geralmente traseira)
+            const backCamera = devices[devices.length - 1];
+            html5QrCode.start(backCamera.id, config, qrCodeSuccessCallback);
+          } else {
+            // Só tem uma câmera
+            html5QrCode.start(devices[0].id, config, qrCodeSuccessCallback);
+          }
+        });
+      })
+      .catch(err => {
+        resultContainer.innerText = "Erro ao acessar câmera: " + err;
+      });
   </script>
 </body>
 </html>
