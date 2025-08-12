@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel Admin - Gerenciar Usuários</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+    #loginForm, #adminPanel { display: none; }
+    input, button { padding: 8px; margin: 5px 0; width: 100%; }
+    ul { padding-left: 20px; }
+    li { margin: 8px 0; }
+    button.deleteUser { background: #d33; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<h1>Painel Admin - Gerenciar Usuários</h1>
+
+<div id="loginForm">
+  <h2>Login Admin</h2>
+  <input type="email" id="adminEmailInput" placeholder="Email" />
+  <input type="password" id="adminPassword" placeholder="Senha" />
+  <button id="btnAdminLogin">Entrar</button>
+  <div id="loginError" style="color:red;"></div>
+</div>
+
+<div id="adminPanel">
+  <button id="btnAdminLogout">Sair</button>
+
+  <h2>Criar Novo Usuário</h2>
+  <input type="email" id="newUserEmail" placeholder="Email do usuário" />
+  <input type="password" id="newUserPassword" placeholder="Senha do usuário" />
+  <button id="btnCreateUser">Criar Usuário</button>
+  <div id="createUserMsg" style="color:green;"></div>
+  <div id="createUserError" style="color:red;"></div>
+
+  <h2>Usuários Cadastrados</h2>
+  <ul id="userList"></ul>
+</div>
+
+<script>
+  // Configuração Firebase - substitua pelos seus dados
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
+    authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
+    projectId: "kd-qr-codes-checkin-eventos",
+    storageBucket: "kd-qr-codes-checkin-eventos.firebasestorage.app",
+    messagingSenderId: "9325387244",
+    appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // Seu email admin para controle de acesso
+  const adminEmail = "kdqrcode@gmail.com";
+
+  const loginForm = document.getElementById('loginForm');
+  const adminPanel = document.getElementById('adminPanel');
+  const loginError = document.getElementById('loginError');
+
+  const btnAdminLogin = document.getElementById('btnAdminLogin');
+  const btnAdminLogout = document.getElementById('btnAdminLogout');
+
+  const adminEmailInput = document.getElementById('adminEmailInput');
+  const adminPassword = document.getElementById('adminPassword');
+
+  const newUserEmail = document.getElementById('newUserEmail');
+  const newUserPassword = document.getElementById('newUserPassword');
+  const btnCreateUser = document.getElementById('btnCreateUser');
+  const createUserMsg = document.getElementById('createUserMsg');
+  const createUserError = document.getElementById('createUserError');
+
+  const userList = document.getElementById('userList');
+
+  function showLogin() {
+    loginForm.style.display = 'block';
+    adminPanel.style.display = 'none';
+  }
+
+  function showAdminPanel() {
+    loginForm.style.display = 'none';
+    adminPanel.style.display = 'block';
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (user && user.email === adminEmail) {
+      showAdminPanel();
+      loadUsers();
+    } else {
+      showLogin();
+    }
+  });
+
+  btnAdminLogin.addEventListener('click', () => {
+    loginError.textContent = '';
+    auth.signInWithEmailAndPassword(adminEmailInput.value, adminPassword.value)
+      .then(userCredential => {
+        if(userCredential.user.email !== adminEmail) {
+          loginError.textContent = "Acesso negado.";
+          auth.signOut();
+        }
+      })
+      .catch(err => {
+        loginError.textContent = err.message;
+      });
+  });
+
+  btnAdminLogout.addEventListener('click', () => {
+    auth.signOut();
+  });
+
+  btnCreateUser.addEventListener('click', () => {
+    createUserMsg.textContent = '';
+    createUserError.textContent = '';
+    const email = newUserEmail.value.trim();
+    const password = newUserPassword.value.trim();
+
+    if (!email || !password) {
+      createUserError.textContent = 'Preencha email e senha.';
+      return;
+    }
+
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(userCredential => {
+        createUserMsg.textContent = 'Usuário criado com sucesso!';
+        newUserEmail.value = '';
+        newUserPassword.value = '';
+        // Salva no Firestore para listar depois
+        return db.collection('usuarios').doc(userCredential.user.uid).set({
+          email: email,
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      })
+      .then(() => loadUsers())
+      .catch(err => {
+        createUserError.textContent = 'Erro: ' + err.message;
+      });
+  });
+
+  function loadUsers() {
+    userList.innerHTML = '';
+    db.collection('usuarios').get().then(snapshot => {
+      if (snapshot.empty) {
+        userList.innerHTML = '<li>Nenhum usuário cadastrado.</li>';
+        return;
+      }
+      snapshot.forEach(doc => {
+        const user = doc.data();
+        const li = document.createElement('li');
+        li.textContent = user.email;
+        const btnDelete = document.createElement('button');
+        btnDelete.textContent = 'Excluir';
+        btnDelete.className = 'deleteUser';
+        btnDelete.addEventListener('click', () => {
+          if (confirm(`Excluir usuário ${user.email}?`)) {
+            db.collection('usuarios').doc(doc.id).delete().then(() => {
+              loadUsers();
+            });
+          }
+        });
+        li.appendChild(btnDelete);
+        userList.appendChild(li);
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
