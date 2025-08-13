@@ -4,133 +4,82 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Leitor de QR Code</title>
-
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
-
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
     #cameraSelection { margin-bottom: 20px; }
     #reader { width: 300px; margin: auto; }
-    #result { margin-top: 20px; font-weight: bold; color: green; min-height: 30px; }
+    #result { margin-top: 20px; font-weight: bold; color: green; min-height: 50px; }
+    #confirmBtn { margin-top: 10px; padding: 8px 12px; display: none; }
     #errorMsg { color: red; margin-top: 10px; }
-    button { padding: 8px 12px; margin-top: 10px; }
   </style>
 </head>
 <body>
+  <h1>Leitor de QR Code</h1>
+  <select id="cameraSelection"></select>
+  <div id="reader"></div>
+  <div id="result"></div>
+  <button id="confirmBtn">Confirmar Entrada</button>
+  <div id="errorMsg"></div>
 
-<h1>Leitor de QR Code</h1>
-<select id="cameraSelection"></select>
-<div id="reader"></div>
-<div id="result"></div>
-<div id="errorMsg"></div>
+  <script>
+    // Configuração Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
+      authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
+      projectId: "kd-qr-codes-checkin-eventos",
+      storageBucket: "kd-qr-codes-checkin-eventos.firebasestorage.app",
+      messagingSenderId: "9325387244",
+      appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-<script>
-  // Configuração do Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
-    authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
-    projectId: "kd-qr-codes-checkin-eventos",
-    storageBucket: "kd-qr-codes-checkin-eventos.firebasestorage.app",
-    messagingSenderId: "9325387244",
-    appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+    const cameraSelection = document.getElementById('cameraSelection');
+    const resultContainer = document.getElementById('result');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    let html5QrCode;
+    let currentCameraId;
+    let lastScanData = null;
 
-  const cameraSelection = document.getElementById('cameraSelection');
-  const resultContainer = document.getElementById('result');
-  const errorMsg = document.getElementById('errorMsg');
-
-  let html5QrCode;
-  let currentCameraId;
-
-  function startScanner(cameraId) {
-    if (html5QrCode) {
-      html5QrCode.stop().catch(() => {}); // para scanner anterior
-    }
-
-    html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: 250 };
-
-    html5QrCode.start(
-      cameraId,
-      config,
-      (decodedText, decodedResult) => {
-        // mostra resultado e cria botão Confirmar Entrada
-        resultContainer.innerHTML = `
-          Código lido: ${decodedText} <br/>
-          <button id="btnConfirmar">Confirmar Entrada</button>
-        `;
-        document.getElementById('btnConfirmar').addEventListener('click', () => {
-          confirmarEntrada(decodedText);
-        });
-        // pausa a leitura enquanto espera confirmação
-        html5QrCode.pause(true);
-      },
-      (errorMessage) => {
-        // ignorar erros pequenos de leitura
+    function startScanner(cameraId) {
+      if(html5QrCode) {
+        html5QrCode.stop().catch(()=>{});
       }
-    ).catch(err => {
-      errorMsg.innerText = "Erro ao iniciar scanner: " + err;
-    });
-  }
-
-  function confirmarEntrada(decodedText) {
-    try {
-      const data = JSON.parse(decodedText); // extrai nome e eventId do QR
-      const { nome, eventId } = data;
-
-      db.collection('eventos').doc(eventId).collection('checkins')
-        .add({
-          nomeConvidado: nome,
-          codigoQr: decodedText,
-          dataHora: firebase.firestore.FieldValue.serverTimestamp()
-        })
-        .then(() => {
-          resultContainer.innerText = "Presença confirmada para " + nome;
-          setTimeout(() => {
-            resultContainer.innerText = "";
-            html5QrCode.resume(); // volta a ler outro QR
-          }, 1500);
-        })
-        .catch(err => {
-          errorMsg.innerText = "Erro ao salvar check-in: " + err;
-        });
-
-    } catch (err) {
-      errorMsg.innerText = "QR Code inválido.";
-      html5QrCode.resume();
-    }
-  }
-
-  // Lista câmeras
-  Html5Qrcode.getCameras().then(devices => {
-    if (devices && devices.length) {
-      devices.forEach(device => {
-        const option = document.createElement('option');
-        option.value = device.id;
-        option.text = device.label || `Câmera ${cameraSelection.length + 1}`;
-        cameraSelection.appendChild(option);
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(cameraId, { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          try {
+            lastScanData = JSON.parse(decodedText);
+            resultContainer.innerText = `Código lido: ${lastScanData.nome}`;
+            confirmBtn.style.display = "inline-block";
+            html5QrCode.pause(); // pausa a câmera até confirmar
+          } catch(e) {
+            resultContainer.innerText = "QR Inválido!";
+          }
+        },
+        (errorMessage) => {
+          // console.log(`Erro de leitura: ${errorMessage}`);
+        }
+      ).catch(err => {
+        errorMsg.innerText = "Erro ao iniciar scanner: " + err;
       });
-      cameraSelection.selectedIndex = devices.length - 1; // geralmente traseira
-      currentCameraId = cameraSelection.value;
-      startScanner(currentCameraId);
-    } else {
-      errorMsg.innerText = "Nenhuma câmera encontrada.";
     }
-  }).catch(err => {
-    errorMsg.innerText = "Erro ao acessar câmeras: " + err;
-  });
 
-  cameraSelection.addEventListener('change', (event) => {
-    currentCameraId = event.target.value;
-    resultContainer.innerText = "";
-    errorMsg.innerText = "";
-    startScanner(currentCameraId);
-  });
-
-</script>
-</body>
-</html>
+    // Carregar câmeras
+    Html5Qrcode.getCameras().then(devices => {
+      if(devices && devices.length) {
+        devices.forEach(device => {
+          const option = document.createElement('option');
+          option.value = device.id;
+          option.text = device.label || `Câmera ${cameraSelection.length+1}`;
+          cameraSelection.appendChild(option);
+        });
+        cameraSelection.selectedIndex = devices.length - 1;
+        currentCameraId = cameraSelection.value;
+        startScanner(currentCameraId);
+      } else errorMsg.innerText = "Nenhuma câmera encontrada.";
+    }).catch
