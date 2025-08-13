@@ -5,49 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Painel do Evento</title>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
+  <!-- QR code: geração e leitura -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
-    h2 { margin-bottom: 10px; }
-    #gerador, #leitor, #checkins { margin-top: 30px; }
-    button { padding: 6px 10px; margin-top: 10px; }
-    input, textarea { width: 100%; padding: 8px; margin: 6px 0; box-sizing: border-box; }
-    ul { padding-left: 20px; }
-    li { margin: 5px 0; }
-    .qr-img { width: 120px; height: 120px; margin: 5px; border: 1px solid #ccc; }
-    .checkin-item { border-bottom: 1px solid #ccc; padding: 5px 0; }
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; }
+    h1 { margin-bottom: 8px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    textarea, input, button { width: 100%; padding: 10px; box-sizing: border-box; }
+    button { cursor: pointer; }
+    .qr-item { display: inline-block; text-align: center; margin: 10px; }
+    .qr-item canvas { width: 140px; height: 140px; }
+    #reader { width: 100%; max-width: 360px; margin-top: 8px; }
+    #status { margin-top: 10px; font-weight: bold; }
+    ul { list-style: none; padding: 0; }
+    li { border-bottom: 1px solid #eee; padding: 8px 0; }
+    .muted { color: #666; font-size: 14px; }
   </style>
 </head>
 <body>
 
-<h1>Painel do Evento</h1>
+<h1 id="nomeEvento">Painel do Evento</h1>
+<div class="muted" id="eventInfo"></div>
 
-<div id="gerador">
-  <h2>Gerador de QR Codes (Nomes separados por linha)</h2>
-  <textarea id="nomesInput" rows="5" placeholder="Digite os nomes dos convidados, um por linha"></textarea><br />
-  <button id="btnGerar">Gerar QR Codes</button>
-  <div id="qrcodes"></div>
+<div class="grid">
+  <!-- GERADOR -->
+  <section>
+    <h2>Gerar QR Codes (um nome por linha)</h2>
+    <textarea id="nomesInput" rows="6" placeholder="Ex.:&#10;João da Silva&#10;Maria Souza"></textarea>
+    <button id="btnGerar">Gerar QR Codes</button>
+    <div id="qrcodes"></div>
+  </section>
+
+  <!-- LEITOR -->
+  <section>
+    <h2>Leitor de QR Code</h2>
+    <div id="reader"></div>
+    <div id="result" class="muted"></div>
+    <button id="btnConfirmar" style="display:none;">Confirmar Presença</button>
+    <div id="status"></div>
+  </section>
 </div>
 
-<div id="leitor">
-  <h2>Leitor de QR Code</h2>
-  <div id="reader" style="width: 300px; margin-bottom: 10px;"></div>
-  <div id="resultadoLeitura"></div>
-  <button id="btnConfirmarEntrada" style="display:none;">Confirmar Entrada</button>
-</div>
+<hr style="margin: 28px 0;" />
 
-<div id="checkins">
-  <h2>Entradas Confirmadas</h2>
-  <ul id="checkinsList"></ul>
-</div>
-
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<!-- LISTA EM TEMPO REAL -->
+<section>
+  <h2>Entradas confirmadas</h2>
+  <ul id="listaCheckins"><li class="muted">Carregando...</li></ul>
+</section>
 
 <script>
-  // Firebase config (mesmo do painel principal)
+  // ==== Firebase config (o mesmo do seu projeto) ====
   const firebaseConfig = {
     apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
     authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
@@ -56,70 +71,86 @@
     messagingSenderId: "9325387244",
     appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
   };
-
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  // Pega o eventId da URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const eventId = urlParams.get('eventId');
+  // ==== Pega eventId da URL ====
+  const params = new URLSearchParams(window.location.search);
+  const eventId = params.get('eventId'); // painel.html abre com ?eventId=...
+  if (!eventId) {
+    alert('eventId não informado na URL.');
+    throw new Error('eventId ausente');
+  }
 
+  // Mostra nome do evento
+  const nomeEventoEl = document.getElementById('nomeEvento');
+  const eventInfoEl = document.getElementById('eventInfo');
+  db.collection('eventos').doc(eventId).get().then(doc => {
+    if (doc.exists) {
+      const data = doc.data();
+      nomeEventoEl.textContent = data.nome || 'Painel do Evento';
+      if (data.criadoEm?.toDate) {
+        eventInfoEl.textContent = `Criado em ${data.criadoEm.toDate().toLocaleString()}`;
+      }
+    }
+  });
+
+  // ======== GERADOR ========
   const nomesInput = document.getElementById('nomesInput');
   const btnGerar = document.getElementById('btnGerar');
   const qrcodesDiv = document.getElementById('qrcodes');
 
-  const readerDiv = document.getElementById('reader');
-  const resultadoLeitura = document.getElementById('resultadoLeitura');
-  const btnConfirmarEntrada = document.getElementById('btnConfirmarEntrada');
-
-  const checkinsList = document.getElementById('checkinsList');
-
-  let html5QrCode;
-  let ultimoCodigoLido = null;
-
-  // Gerar QR Codes para cada nome e salvar no Firestore no evento
   btnGerar.addEventListener('click', async () => {
-    const nomes = nomesInput.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
-    if (nomes.length === 0) {
+    const nomes = nomesInput.value
+      .split('\n')
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+
+    if (!nomes.length) {
       alert('Digite pelo menos um nome.');
       return;
     }
-    qrcodesDiv.innerHTML = 'Gerando...';
-    // Vamos gerar QR codes no formato JSON simples com nome + evento
+
     qrcodesDiv.innerHTML = '';
-
     for (const nome of nomes) {
-      const codigo = JSON.stringify({ eventId, nome });
-      // Salva no Firestore se ainda não existir esse nome para evitar duplicados
-      const query = await db.collection('eventos').doc(eventId).collection('convidados')
-        .where('nome', '==', nome).get();
+      // Conteúdo do QR: { eventId, nome }
+      const payload = JSON.stringify({ eventId, nome });
 
-      if (query.empty) {
-        await db.collection('eventos').doc(eventId).collection('convidados').add({
+      // Evita duplicar convidado com o mesmo nome (opcional)
+      const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
+      const exists = await convidadosRef.where('nome', '==', nome).limit(1).get();
+      if (exists.empty) {
+        await convidadosRef.add({
           nome,
-          qrCode: codigo,
-          entrou: false,
-          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+          qrCode: payload,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
 
-      // Gera o QR code visual
+      // Renderiza QR visual
       const canvas = document.createElement('canvas');
-      await QRCode.toCanvas(canvas, codigo, { width: 120 });
-      const div = document.createElement('div');
-      div.style.display = 'inline-block';
-      div.style.margin = '10px';
-      div.style.textAlign = 'center';
-      div.appendChild(canvas);
-      const p = document.createElement('p');
-      p.textContent = nome;
-      div.appendChild(p);
-      qrcodesDiv.appendChild(div);
+      await QRCode.toCanvas(canvas, payload, { width: 140 });
+      const wrap = document.createElement('div');
+      wrap.className = 'qr-item';
+      wrap.appendChild(canvas);
+      const lbl = document.createElement('div');
+      lbl.textContent = nome;
+      wrap.appendChild(lbl);
+      qrcodesDiv.appendChild(wrap);
     }
+
+    nomesInput.value = '';
   });
 
-  // Inicializa o leitor de QR Code
-  function startLeitor(cameraId) {
+  // ======== LEITOR ========
+  const resultEl = document.getElementById('result');
+  const statusEl = document.getElementById('status');
+  const btnConfirmar = document.getElementById('btnConfirmar');
+  let html5QrCode;
+  let ultimoQRCodeLido = null;
+  let currentCameraId = null;
+
+  function startScanner(cameraId) {
     if (html5QrCode) {
       html5QrCode.stop().catch(() => {});
     }
@@ -128,103 +159,102 @@
     html5QrCode.start(
       cameraId,
       config,
-      (decodedText, decodedResult) => {
-        resultadoLeitura.textContent = 'Código lido: ' + decodedText;
-        ultimoCodigoLido = decodedText;
-        btnConfirmarEntrada.style.display = 'inline-block';
-        html5QrCode.stop();
+      (decodedText) => {
+        ultimoQRCodeLido = decodedText;
+        resultEl.textContent = 'Código lido. Toque em "Confirmar Presença".';
+        btnConfirmar.style.display = 'inline-block';
+        html5QrCode.stop().catch(() => {});
       },
-      (error) => {
-        // erros pequenos podem ser ignorados
-      }
+      () => {}
     ).catch(err => {
-      resultadoLeitura.textContent = 'Erro ao iniciar leitor: ' + err;
+      statusEl.textContent = 'Erro ao iniciar leitor: ' + err;
     });
   }
 
-  // Pega as câmeras e inicia com a traseira (última da lista)
+  // Pega câmeras e inicia com a traseira (última)
   Html5Qrcode.getCameras().then(devices => {
     if (devices && devices.length) {
-      const cameraId = devices[devices.length - 1].id;
-      startLeitor(cameraId);
+      currentCameraId = devices[devices.length - 1].id;
+      startScanner(currentCameraId);
     } else {
-      resultadoLeitura.textContent = 'Nenhuma câmera encontrada.';
+      statusEl.textContent = 'Nenhuma câmera encontrada.';
     }
   }).catch(err => {
-    resultadoLeitura.textContent = 'Erro ao acessar câmeras: ' + err;
+    statusEl.textContent = 'Erro ao acessar câmeras: ' + err;
   });
 
-  btnConfirmarEntrada.addEventListener('click', async () => {
-    if (!ultimoCodigoLido) {
-      alert('Nenhum código lido para confirmar.');
-      return;
-    }
+  // Confirma presença -> salva em /eventos/{eventId}/checkins
+  btnConfirmar.addEventListener('click', async () => {
+    statusEl.textContent = '';
+    if (!ultimoQRCodeLido) return;
+
     let dados;
     try {
-      dados = JSON.parse(ultimoCodigoLido);
+      dados = JSON.parse(ultimoQRCodeLido);
     } catch {
-      alert('Código QR inválido.');
+      alert('QR inválido.');
+      return;
+    }
+
+    if (!dados.eventId || !dados.nome) {
+      alert('QR incompleto.');
       return;
     }
     if (dados.eventId !== eventId) {
-      alert('QR Code não pertence a este evento.');
+      alert('Este QR não pertence a este evento.');
       return;
     }
 
-    // Procura o convidado e confirma entrada
-    const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
-    const query = await convidadosRef.where('nome', '==', dados.nome).get();
+    const checkinsRef = db.collection('eventos').doc(eventId).collection('checkins');
 
-    if (query.empty) {
-      alert('Convidado não encontrado.');
+    // Bloqueia reutilização: se já tiver checkin por este nome, não deixa novamente.
+    const jaConfirmado = await checkinsRef.where('nomeConvidado', '==', dados.nome).limit(1).get();
+    if (!jaConfirmado.empty) {
+      alert('Este QR já foi utilizado.');
+      // limpa e reinicia leitor
+      ultimoQRCodeLido = null;
+      btnConfirmar.style.display = 'none';
+      resultEl.textContent = '';
+      startScanner(currentCameraId);
       return;
     }
 
-    const doc = query.docs[0];
-    if (doc.data().entrou) {
-      alert('Presença já confirmada para este convidado.');
-      return;
-    }
-
-    await convidadosRef.doc(doc.id).update({
-      entrou: true,
-      horarioEntrada: firebase.firestore.FieldValue.serverTimestamp()
+    await checkinsRef.add({
+      nomeConvidado: dados.nome,
+      codigoQr: ultimoQRCodeLido,
+      dataHora: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    alert(`Entrada confirmada para ${dados.nome}!`);
-    resultadoLeitura.textContent = '';
-    btnConfirmarEntrada.style.display = 'none';
-    ultimoCodigoLido = null;
-    loadCheckins();
+    statusEl.textContent = '✅ Presença confirmada para ' + dados.nome;
+    btnConfirmar.style.display = 'none';
+    resultEl.textContent = '';
+    ultimoQRCodeLido = null;
+
     // reinicia o leitor
-    startLeitor(devices[devices.length - 1].id);
+    startScanner(currentCameraId);
   });
 
-  // Lista os convidados que já entraram
-  async function loadCheckins() {
-    checkinsList.innerHTML = '';
-    const convidados = await db.collection('eventos').doc(eventId).collection('convidados')
-      .where('entrou', '==', true)
-      .orderBy('horarioEntrada', 'desc')
-      .get();
-
-    if (convidados.empty) {
-      checkinsList.innerHTML = '<li>Nenhuma entrada confirmada ainda.</li>';
-      return;
-    }
-
-    convidados.forEach(doc => {
-      const data = doc.data();
-      const li = document.createElement('li');
-      const hora = data.horarioEntrada ? data.horarioEntrada.toDate().toLocaleString() : '';
-      li.classList.add('checkin-item');
-      li.textContent = `${data.nome} - Entrada às ${hora}`;
-      checkinsList.appendChild(li);
+  // ======== LISTA EM TEMPO REAL ========
+  const listaCheckins = document.getElementById('listaCheckins');
+  db.collection('eventos').doc(eventId).collection('checkins')
+    .orderBy('dataHora', 'desc')
+    .onSnapshot(snapshot => {
+      listaCheckins.innerHTML = '';
+      if (snapshot.empty) {
+        listaCheckins.innerHTML = '<li class="muted">Nenhum check-in confirmado ainda.</li>';
+        return;
+      }
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const quando = data.dataHora?.toDate ? data.dataHora.toDate().toLocaleString() : '—';
+        const li = document.createElement('li');
+        li.textContent = `${data.nomeConvidado} — ${quando}`;
+        listaCheckins.appendChild(li);
+      });
+    }, err => {
+      listaCheckins.innerHTML = `<li class="muted">Erro ao carregar: ${err.message}</li>`;
     });
-  }
 
-  loadCheckins();
 </script>
-
 </body>
 </html>
