@@ -62,7 +62,7 @@
 </section>
 
 <script>
-  // ==== Firebase config ====
+  // ==== Firebase config (o mesmo do seu projeto) ====
   const firebaseConfig = {
     apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
     authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
@@ -76,7 +76,7 @@
 
   // ==== Pega eventId da URL ====
   const params = new URLSearchParams(window.location.search);
-  const eventId = params.get('eventId');
+  const eventId = params.get('eventId'); // painel.html abre com ?eventId=...
   if (!eventId) {
     alert('eventId não informado na URL.');
     throw new Error('eventId ausente');
@@ -113,7 +113,10 @@
 
     qrcodesDiv.innerHTML = '';
     for (const nome of nomes) {
+      // Conteúdo do QR: { eventId, nome }
       const payload = JSON.stringify({ eventId, nome });
+
+      // Evita duplicar convidado com o mesmo nome
       const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
       const exists = await convidadosRef.where('nome', '==', nome).limit(1).get();
       if (exists.empty) {
@@ -123,6 +126,8 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
+
+      // Renderiza QR visual
       const canvas = document.createElement('canvas');
       await QRCode.toCanvas(canvas, payload, { width: 140 });
       const wrap = document.createElement('div');
@@ -133,6 +138,7 @@
       wrap.appendChild(lbl);
       qrcodesDiv.appendChild(wrap);
     }
+
     nomesInput.value = '';
   });
 
@@ -144,20 +150,22 @@
   let ultimoQRCodeLido = null;
   let currentCameraId = null;
 
-  async function startScanner(cameraId) {
+  function startScanner(cameraId) {
     if (html5QrCode) {
-      try { await html5QrCode.stop(); } catch {}
+      html5QrCode.stop().catch(() => {});
     }
     html5QrCode = new Html5Qrcode("reader");
     const config = { fps: 10, qrbox: 250 };
+
     html5QrCode.start(
       cameraId,
       config,
       (decodedText) => {
-        ultimoQRCodeLido = decodedText;
-        resultEl.textContent = 'Código lido. Clique em "Confirmar Presença".';
-        btnConfirmar.style.display = 'inline-block';
-        html5QrCode.stop().catch(() => {}); // para até confirmar
+        if (!ultimoQRCodeLido) { // impede várias leituras seguidas
+          ultimoQRCodeLido = decodedText;
+          resultEl.textContent = 'Código lido. Toque em "Confirmar Presença".';
+          btnConfirmar.style.display = 'inline-block';
+        }
       },
       () => {}
     ).catch(err => {
@@ -165,6 +173,7 @@
     });
   }
 
+  // Pega câmeras e inicia com a traseira (última)
   Html5Qrcode.getCameras().then(devices => {
     if (devices && devices.length) {
       currentCameraId = devices[devices.length - 1].id;
@@ -172,39 +181,66 @@
     } else {
       statusEl.textContent = 'Nenhuma câmera encontrada.';
     }
+  }).catch(err => {
+    statusEl.textContent = 'Erro ao acessar câmeras: ' + err;
   });
 
   btnConfirmar.addEventListener('click', async () => {
+    statusEl.textContent = '';
     if (!ultimoQRCodeLido) return;
+
     let dados;
-    try { dados = JSON.parse(ultimoQRCodeLido); } catch {
-      alert('QR inválido.'); return;
+    try {
+      dados = JSON.parse(ultimoQRCodeLido);
+    } catch {
+      alert('QR inválido.');
+      resetScanner();
+      return;
+    }
+
+    if (!dados.eventId || !dados.nome) {
+      alert('QR incompleto.');
+      resetScanner();
+      return;
     }
     if (dados.eventId !== eventId) {
       alert('Este QR não pertence a este evento.');
+      resetScanner();
       return;
     }
 
     const checkinsRef = db.collection('eventos').doc(eventId).collection('checkins');
+
     const jaConfirmado = await checkinsRef.where('nomeConvidado', '==', dados.nome).limit(1).get();
     if (!jaConfirmado.empty) {
       alert('Este QR já foi utilizado.');
-    } else {
-      await checkinsRef.add({
-        nomeConvidado: dados.nome,
-        codigoQr: ultimoQRCodeLido,
-        dataHora: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      statusEl.textContent = '✅ Presença confirmada para ' + dados.nome;
+      resetScanner();
+      return;
     }
 
+    await checkinsRef.add({
+      nomeConvidado: dados.nome,
+      codigoQr: ultimoQRCodeLido,
+      dataHora: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    statusEl.textContent = '✅ Presença confirmada para ' + dados.nome;
+    resetScanner();
+  });
+
+  function resetScanner() {
     btnConfirmar.style.display = 'none';
     resultEl.textContent = '';
     ultimoQRCodeLido = null;
 
-    // Reinicia câmera
-    startScanner(currentCameraId);
-  });
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        startScanner(currentCameraId);
+      }).catch(() => {
+        startScanner(currentCameraId);
+      });
+    }
+  }
 
   // ======== LISTA EM TEMPO REAL ========
   const listaCheckins = document.getElementById('listaCheckins');
@@ -223,6 +259,8 @@
         li.textContent = `${data.nomeConvidado} — ${quando}`;
         listaCheckins.appendChild(li);
       });
+    }, err => {
+      listaCheckins.innerHTML = `<li class="muted">Erro ao carregar: ${err.message}</li>`;
     });
 </script>
 </body>
