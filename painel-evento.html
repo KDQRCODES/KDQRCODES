@@ -58,4 +58,172 @@
 <!-- LISTA EM TEMPO REAL -->
 <section>
   <h2>Entradas confirmadas</h2>
-  <ul id="listaCheckins"><li class="muted">C
+  <ul id="listaCheckins"><li class="muted">Carregando...</li></ul>
+</section>
+
+<script>
+  // ==== Firebase config ====
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
+    authDomain: "kd-qr-codes-checkin-eventos.firebaseapp.com",
+    projectId: "kd-qr-codes-checkin-eventos",
+    storageBucket: "kd-qr-codes-checkin-eventos.firebasestorage.app",
+    messagingSenderId: "9325387244",
+    appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // ==== Pega eventId da URL ====
+  const params = new URLSearchParams(window.location.search);
+  const eventId = params.get('eventId');
+  if (!eventId) {
+    alert('eventId não informado na URL.');
+    throw new Error('eventId ausente');
+  }
+
+  // Mostra nome do evento
+  const nomeEventoEl = document.getElementById('nomeEvento');
+  const eventInfoEl = document.getElementById('eventInfo');
+  db.collection('eventos').doc(eventId).get().then(doc => {
+    if (doc.exists) {
+      const data = doc.data();
+      nomeEventoEl.textContent = data.nome || 'Painel do Evento';
+      if (data.criadoEm?.toDate) {
+        eventInfoEl.textContent = `Criado em ${data.criadoEm.toDate().toLocaleString()}`;
+      }
+    }
+  });
+
+  // ======== GERADOR ========
+  const nomesInput = document.getElementById('nomesInput');
+  const btnGerar = document.getElementById('btnGerar');
+  const qrcodesDiv = document.getElementById('qrcodes');
+
+  btnGerar.addEventListener('click', async () => {
+    const nomes = nomesInput.value
+      .split('\n')
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+
+    if (!nomes.length) {
+      alert('Digite pelo menos um nome.');
+      return;
+    }
+
+    qrcodesDiv.innerHTML = '';
+    for (const nome of nomes) {
+      const payload = JSON.stringify({ eventId, nome });
+      const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
+      const exists = await convidadosRef.where('nome', '==', nome).limit(1).get();
+      if (exists.empty) {
+        await convidadosRef.add({
+          nome,
+          qrCode: payload,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, payload, { width: 140 });
+      const wrap = document.createElement('div');
+      wrap.className = 'qr-item';
+      wrap.appendChild(canvas);
+      const lbl = document.createElement('div');
+      lbl.textContent = nome;
+      wrap.appendChild(lbl);
+      qrcodesDiv.appendChild(wrap);
+    }
+    nomesInput.value = '';
+  });
+
+  // ======== LEITOR ========
+  const resultEl = document.getElementById('result');
+  const statusEl = document.getElementById('status');
+  const btnConfirmar = document.getElementById('btnConfirmar');
+  let html5QrCode;
+  let ultimoQRCodeLido = null;
+  let currentCameraId = null;
+
+  async function startScanner(cameraId) {
+    if (html5QrCode) {
+      try { await html5QrCode.stop(); } catch {}
+    }
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: 250 };
+    html5QrCode.start(
+      cameraId,
+      config,
+      (decodedText) => {
+        ultimoQRCodeLido = decodedText;
+        resultEl.textContent = 'Código lido. Clique em "Confirmar Presença".';
+        btnConfirmar.style.display = 'inline-block';
+        html5QrCode.stop().catch(() => {}); // para até confirmar
+      },
+      () => {}
+    ).catch(err => {
+      statusEl.textContent = 'Erro ao iniciar leitor: ' + err;
+    });
+  }
+
+  Html5Qrcode.getCameras().then(devices => {
+    if (devices && devices.length) {
+      currentCameraId = devices[devices.length - 1].id;
+      startScanner(currentCameraId);
+    } else {
+      statusEl.textContent = 'Nenhuma câmera encontrada.';
+    }
+  });
+
+  btnConfirmar.addEventListener('click', async () => {
+    if (!ultimoQRCodeLido) return;
+    let dados;
+    try { dados = JSON.parse(ultimoQRCodeLido); } catch {
+      alert('QR inválido.'); return;
+    }
+    if (dados.eventId !== eventId) {
+      alert('Este QR não pertence a este evento.');
+      return;
+    }
+
+    const checkinsRef = db.collection('eventos').doc(eventId).collection('checkins');
+    const jaConfirmado = await checkinsRef.where('nomeConvidado', '==', dados.nome).limit(1).get();
+    if (!jaConfirmado.empty) {
+      alert('Este QR já foi utilizado.');
+    } else {
+      await checkinsRef.add({
+        nomeConvidado: dados.nome,
+        codigoQr: ultimoQRCodeLido,
+        dataHora: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      statusEl.textContent = '✅ Presença confirmada para ' + dados.nome;
+    }
+
+    btnConfirmar.style.display = 'none';
+    resultEl.textContent = '';
+    ultimoQRCodeLido = null;
+
+    // Reinicia câmera
+    startScanner(currentCameraId);
+  });
+
+  // ======== LISTA EM TEMPO REAL ========
+  const listaCheckins = document.getElementById('listaCheckins');
+  db.collection('eventos').doc(eventId).collection('checkins')
+    .orderBy('dataHora', 'desc')
+    .onSnapshot(snapshot => {
+      listaCheckins.innerHTML = '';
+      if (snapshot.empty) {
+        listaCheckins.innerHTML = '<li class="muted">Nenhum check-in confirmado ainda.</li>';
+        return;
+      }
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const quando = data.dataHora?.toDate ? data.dataHora.toDate().toLocaleString() : '—';
+        const li = document.createElement('li');
+        li.textContent = `${data.nomeConvidado} — ${quando}`;
+        listaCheckins.appendChild(li);
+      });
+    });
+</script>
+</body>
+</html>
