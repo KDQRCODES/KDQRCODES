@@ -703,12 +703,6 @@ button:hover {
     margin-bottom: 75px;
 }
 
-.title-admin {
-    color: var(--text);
-    font-size: 4rem;
-    text-align: center;
-}
-
 #painelPage {
     display: flex;
     flex-direction: column;
@@ -726,6 +720,7 @@ button:hover {
     width: 100%;
     max-width: 450px;
     position: relative;
+    min-height: 400px;
 }
 
 
@@ -933,6 +928,14 @@ button:hover {
 
 }
 
+
+.title-admin {
+    color: var(--text);
+    font-size: 4rem;
+    text-align: center;
+}
+
+
 .cards-container {
 
     display: flex;
@@ -973,27 +976,93 @@ button:hover {
 
 }
 
-#eventsPanel {
-
-    min-height: 400px;
-
-}
-
-
-
-#usersPanel {
-
-    min-height: 400px;
-
-    justify-content: flex-start;
+/* Estilo para as seções de tipo de usuário */
+.user-type-section {
+    margin-top: 25px;
 
 }
 
-#userList {
-    list-style-type: none;
+.user-type-section h3 {
+    border-bottom: 2px solid #007bff; /* Linha azul de destaque */
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    /* color: #333; */
+}
+
+/* Estilo para a lista de usuários */
+.user-list {
+    list-style: none;
     padding: 0;
-    margin: 10px 0;
+}
+
+.user-list li {
+    border-radius: 6px;
+    margin-bottom: 12px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.user-list li:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-info {
+    font-size: 1em;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.user-info span{
+    font-size: 20px;
+    font-weight: 700;
+}
+
+
+/* Estilo para os controles de permissão (dropdown e botão) */
+.permission-controls {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.event-permission-select {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.save-permissions-btn {
+    padding: 8px 15px;
+    background-color: #28a745;
     color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.save-permissions-btn:hover {
+    background-color: #218838;
+}
+
+/* Estilo para o botão de Excluir */
+.deleteUser {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.deleteUser:hover {
+    background-color: #c82333;
 }
 
 

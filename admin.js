@@ -14,7 +14,9 @@ function initAdminPanel() {
 
   const usersPanel = document.getElementById("usersPanel");
   const btnCreateUser = document.getElementById("btnCreateUser");
-  const userList = document.getElementById("userList");
+  const clientList = document.getElementById("clientList");
+  const securityList = document.getElementById("securityList");
+  const adminList = document.getElementById("adminList");
 
   const eventIframe = document.getElementById("eventIframe");
   const btnBackToEvents = document.getElementById("btnBackToEvents");
@@ -30,7 +32,6 @@ function initAdminPanel() {
   // Logout correto
   const btnLogoutDropdown = document.getElementById("btnLogoutDropdown");
 
-  // Usa os objetos 'auth' e 'db' globais, definidos em firebase-config.js
   const currentUser = auth.currentUser;
 
   function showAdminPanels() {
@@ -54,7 +55,6 @@ function initAdminPanel() {
     const userDocRef = db.collection("usuarios").doc(user.uid);
     const userDoc = await userDocRef.get();
 
-    // CORRIGIDO: de userDoc.exists() para userDoc.exists
     if (!userDoc.exists || userDoc.data().tipo !== "administrador") {
       window.location.href = "painel.html";
       return;
@@ -87,6 +87,7 @@ function initAdminPanel() {
           nome: nomeEvento,
           criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
           criadoPor: auth.currentUser.uid,
+          visivelPara: [auth.currentUser.uid]
         });
         newEventNameInput.value = "";
         loadAllEvents();
@@ -99,7 +100,6 @@ function initAdminPanel() {
   async function getCreatorName(uid) {
     if (!uid) return "Desconhecido";
     const userDoc = await db.collection("usuarios").doc(uid).get();
-    // CORRIGIDO: de u.exists() para u.exists
     return userDoc.exists ? userDoc.data().nome : "Usuário Removido";
   }
 
@@ -115,7 +115,6 @@ function initAdminPanel() {
 
     for (const d of snapshot.docs) {
       const ev = d.data();
-      // Removido: A linha que buscava o nome do criador do evento
       const li = document.createElement("li");
       li.innerHTML = `
         <span>${ev.nome}</span>
@@ -139,31 +138,107 @@ function initAdminPanel() {
   }
 
   async function loadAllUsers() {
-    userList.innerHTML = "";
+    clientList.innerHTML = "";
+    securityList.innerHTML = "";
+    adminList.innerHTML = "";
+
     const q = db.collection("usuarios");
     const snapshot = await q.get();
 
     if (snapshot.empty) {
-      userList.innerHTML = "<li>Nenhum usuário cadastrado.</li>";
+      clientList.innerHTML = "<li>Nenhum usuário cadastrado.</li>";
       return;
     }
+    
+    const allEventsSnapshot = await db.collection("eventos").get();
+    const allEvents = allEventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     snapshot.forEach((d) => {
       const user = d.data();
       const li = document.createElement("li");
-      li.innerHTML = `
-        <span>${user.nome}</span>
-        <button class="deleteUser" data-user-id="${d.id}">Excluir</button>
-      `;
-      li.querySelector(".deleteUser").addEventListener("click", async (event) => {
-        event.stopPropagation();
-        if (confirm(`Excluir usuário ${user.nome}?`)) {
-          await db.collection("usuarios").doc(d.id).delete();
-          loadAllUsers();
-        }
-      });
-      userList.appendChild(li);
+      
+      let targetList = null;
+      let userIsClient = false;
+      
+      if (user.tipo === "cliente") {
+          targetList = clientList;
+          userIsClient = true;
+      } else if (user.tipo === "segurança") {
+          targetList = securityList;
+      } else if (user.tipo === "administrador") {
+          targetList = adminList;
+      }
+
+      if (targetList) {
+          let extraContent = '';
+
+          if (userIsClient) {
+            // CORRIGIDO: O atributo 'multiple' foi removido para ser um dropdown de seleção única.
+            extraContent = `
+              <div class="permission-controls">
+                <select class="event-permission-select" data-user-id="${d.id}">
+                </select>
+                <button class="save-permissions-btn" data-user-id="${d.id}">Salvar</button>
+              </div>
+            `;
+          }
+
+          li.innerHTML = `
+            <div class="user-info">
+              <span>${user.nome}</span>
+              ${extraContent}
+            </div>
+            <button class="deleteUser" data-user-id="${d.id}">Excluir</button>
+          `;
+          
+          targetList.appendChild(li);
+          
+          if (userIsClient) {
+              const selectEl = li.querySelector('.event-permission-select');
+              allEvents.forEach(event => {
+                  const option = document.createElement('option');
+                  option.value = event.id;
+                  option.textContent = event.nome;
+                  if (event.visivelPara && event.visivelPara.includes(d.id)) {
+                      option.selected = true;
+                  }
+                  selectEl.appendChild(option);
+              });
+              
+              li.querySelector('.save-permissions-btn').addEventListener('click', async () => {
+                  const selectedEventId = selectEl.value;
+                  await updatePermissionsForUser(d.id, selectedEventId);
+              });
+          }
+      }
     });
+  }
+
+  async function updatePermissionsForUser(userId, selectedEventId) {
+      try {
+          const allEventsSnapshot = await db.collection('eventos').get();
+          for (const doc of allEventsSnapshot.docs) {
+              const eventId = doc.id;
+              const eventData = doc.data();
+              let visivelPara = eventData.visivelPara || [];
+
+              const hasPermission = visivelPara.includes(userId);
+              const shouldHavePermission = selectedEventId === eventId;
+
+              if (shouldHavePermission && !hasPermission) {
+                  visivelPara = [userId]; // NOVO: Apenas o novo evento selecionado
+                  await db.collection('eventos').doc(eventId).update({ visivelPara: visivelPara });
+              } else if (!shouldHavePermission && hasPermission) {
+                  visivelPara = visivelPara.filter(id => id !== userId);
+                  await db.collection('eventos').doc(eventId).update({ visivelPara: visivelPara });
+              }
+          }
+          alert('Permissão de evento atualizada com sucesso!');
+          loadAllUsers();
+      } catch (error) {
+          alert('Erro ao atualizar a permissão.');
+          console.error("Erro ao atualizar permissão:", error);
+      }
   }
 
   if (btnCreateUser) {
@@ -175,7 +250,6 @@ function initAdminPanel() {
   async function setupUserMenu(user) {
     if (!user) return;
     const userDoc = await db.collection("usuarios").doc(user.uid).get();
-    // CORRIGIDO: de userDoc.exists() para userDoc.exists
     if (!userDoc.exists) return;
 
     const userData = userDoc.data();
