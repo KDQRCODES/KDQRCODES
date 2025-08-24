@@ -33,24 +33,23 @@ document.addEventListener('DOMContentLoaded', () => {
             createSuccess.textContent = '';
             btnCreate.disabled = true;
 
-            // Validação de senha
-            const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
-            if (!passwordRegex.test(password)) {
-                createError.textContent = 'A senha deve ter no mínimo 6 caracteres, com pelo menos 1 letra e 1 número.';
+            // VALIDAÇÃO DE SENHA AJUSTADA
+            if (password.length < 6) {
+                createError.textContent = 'A senha deve ter no mínimo 6 caracteres.';
                 btnCreate.disabled = false;
                 return;
             }
 
             try {
-                // CORRIGIDO: Usa auth.createUserWithEmailAndPassword
+                // Usa a sintaxe de compatibilidade do Firestore
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
 
-                // CORRIGIDO: Usa a sintaxe de compatibilidade do Firestore
+                // Usa a sintaxe de compatibilidade do Firestore
                 await db.collection('usuarios').doc(userCredential.user.uid).set({
                     nome: name,
                     email: email,
                     tipo: userType,
-                    // CORRIGIDO: Usa a sintaxe de compatibilidade para serverTimestamp
+                    // Usa a sintaxe de compatibilidade para serverTimestamp
                     criadoEm: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
