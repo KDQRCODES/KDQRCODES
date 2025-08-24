@@ -115,7 +115,6 @@ function initAdminPanel() {
 
     for (const d of snapshot.docs) {
       const ev = d.data();
-      const creatorName = await getCreatorName(ev.criadoPor);
       const li = document.createElement("li");
       li.innerHTML = `
         <span>${ev.nome} (Criado por: ${creatorName})</span>
