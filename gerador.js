@@ -74,7 +74,6 @@ async function initGeradorPage(user) {
     loadEvents();
     setupUserMenu(user);
 
-    // Adiciona um evento para o botão de gerar
     btnGerar.addEventListener('click', async () => {
         const eventId = eventSelection.value;
         const nomes = nomesInput.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
@@ -95,18 +94,18 @@ async function initGeradorPage(user) {
 
         for (const nome of nomes) {
             try {
-                // Checa se o convidado já existe
                 const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
                 const querySnapshot = await convidadosRef.where('nome', '==', nome).get();
 
                 if (querySnapshot.empty) {
                     // Prepara o valor para o QR Code (uma URL com parâmetros)
-                    const qrCodeValue = `https://seusite.com/checkin.html?eventId=${eventId}&nome=${encodeURIComponent(nome)}`;
+                    const qrCodeValue = `{"eventId": "${eventId}", "nome": "${nome}"}`;
                     
                     // CORRIGIDO: Usa QRCode.toDataURL, que é a forma correta da biblioteca que você está usando
-                    const qrCodeUrl = await QRCode.toDataURL(qrCodeValue);
-                    
-                    // Adiciona o documento do convidado com a URL do QR Code
+                    const qrCodeUrl = await QRCode.toDataURL(qrCodeValue, {
+                        errorCorrectionLevel: 'H'
+                    });
+
                     await convidadosRef.add({
                         nome: nome,
                         checkin: false,
@@ -136,7 +135,6 @@ async function initGeradorPage(user) {
         geradorStatus.textContent = 'Processo de adição concluído.';
         btnGerar.disabled = false;
     });
-
 
     if(userProfileSummary) userProfileSummary.addEventListener('click', () => {
         if(userDropdown) userDropdown.classList.toggle('show');
