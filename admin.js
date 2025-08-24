@@ -115,9 +115,10 @@ function initAdminPanel() {
 
     for (const d of snapshot.docs) {
       const ev = d.data();
+      // Removido: A linha que buscava o nome do criador do evento
       const li = document.createElement("li");
       li.innerHTML = `
-        <span>${ev.nome} (Criado por: ${creatorName})</span>
+        <span>${ev.nome}</span>
         <button class="deleteEvent" data-event-id="${d.id}">Excluir</button>
       `;
 
