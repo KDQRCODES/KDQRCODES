@@ -228,26 +228,62 @@ function initPainelEvento(user) {
                 throw new Error('Nenhuma arte de template foi enviada para este evento.');
             }
             
-            const response = await fetch(GENERATE_ART_FUNCTION_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                mode: 'cors',
-                body: JSON.stringify({
-                    eventId: eventId,
-                    nome: guestData.nome
-                })
+            // --- NOVA LÓGICA DE GERAÇÃO DA ARTE NO CLIENTE ---
+            qrcodeImageContainer.innerHTML = 'Gerando convite...';
+
+            // 1. Carrega o template da arte como uma imagem
+            const templateImg = new Image();
+            templateImg.crossOrigin = "anonymous";
+            templateImg.src = artTemplateUrl;
+
+            await new Promise((resolve, reject) => {
+                templateImg.onload = resolve;
+                templateImg.onerror = reject;
             });
-
-            if (!response.ok) {
-                throw new Error('Erro ao gerar a arte do QR Code.');
-            }
             
-            generatedArtBlob = await response.blob();
-            const imageUrl = URL.createObjectURL(generatedArtBlob);
+            // 2. Cria um canvas e desenha a imagem do template
+            const canvas = document.createElement('canvas');
+            canvas.width = templateImg.width;
+            canvas.height = templateImg.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(templateImg, 0, 0);
 
+            // 3. Gera o QR Code com a URL salva no Firestore
+            const qrCodeValue = guestData.qrCode;
+            const qrCodeSize = 415; // Ajuste o tamanho do QR Code
+            
+            const qrCodeImg = new Image();
+            qrCodeImg.src = qrCodeValue;
+            
+            await new Promise((resolve, reject) => {
+                qrCodeImg.onload = resolve;
+                qrCodeImg.onerror = reject;
+            });
+            
+            // 4. Calcula a posição para colar o QR Code no centro da área designada
+            // Essas coordenadas (position_x, position_y) foram retiradas da sua Cloud Function
+            const position_x = 337;
+            const position_y = 1257;
+
+            // 5. Redimensiona o QR Code e o cola no canvas
+            const qrCodeResized = await new Promise(resolve => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = qrCodeSize;
+                tempCanvas.height = qrCodeSize;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(qrCodeImg, 0, 0, qrCodeSize, qrCodeSize);
+                resolve(tempCanvas);
+            });
+            
+            ctx.drawImage(qrCodeResized, position_x, position_y);
+
+            // 6. Converte o canvas para uma imagem e exibe no modal
+            const finalImageUrl = canvas.toDataURL('image/png');
+            generatedArtBlob = await (await fetch(finalImageUrl)).blob();
+            
             qrcodeImageContainer.innerHTML = '';
             const img = document.createElement('img');
-            img.src = imageUrl;
+            img.src = finalImageUrl;
             img.style.maxWidth = '100%';
             img.style.borderRadius = '10px';
             qrcodeImageContainer.appendChild(img);
@@ -257,7 +293,7 @@ function initPainelEvento(user) {
 
             downloadFullArtBtn.onclick = () => {
                 const link = document.createElement('a');
-                link.href = imageUrl;
+                link.href = finalImageUrl;
                 link.download = `${guestData.nome}_Convite.png`;
                 document.body.appendChild(link);
                 link.click();
@@ -266,7 +302,7 @@ function initPainelEvento(user) {
 
             downloadQrcodeOnlyBtn.onclick = async () => {
                 const link = document.createElement('a');
-                link.href = guestData.qrCode; 
+                link.href = guestData.qrCode;
                 link.download = `${guestData.nome}_QRCode.png`;
                 document.body.appendChild(link);
                 link.click();

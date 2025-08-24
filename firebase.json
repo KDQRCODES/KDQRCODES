@@ -11,5 +11,15 @@
       ],
       "runtime": "python313"
     }
-  ]
+  ],
+
+  "hosting": {
+    "public": ".",
+    "site": "kd-qr-codes-checkin-eventos",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
 }
