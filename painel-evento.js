@@ -1,4 +1,5 @@
 // Nenhum import é necessário aqui
+
 document.addEventListener('DOMContentLoaded', () => {
     // Usa o objeto 'auth' global definido em firebase-config.js
     auth.onAuthStateChanged(user => {
@@ -10,14 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Define o número máximo de itens a serem mostrados inicialmente
 const MAX_ITEMS = 10;
-// URL da sua Cloud Function (mantida por segurança, mas não mais usada)
 const GENERATE_ART_FUNCTION_URL = 'https://us-central1-kd-qr-codes-checkin-eventos.cloudfunctions.net/generateArt';
 
 let artTemplateUrl = null;
 let generatedArtBlob = null;
-let isExportCancelled = false;
+let isExportCancelled = false; 
 let currentGuestId = null;
 let allPendingGuests = [];
 
@@ -30,7 +29,7 @@ function initPainelEvento(user) {
         window.location.href = 'painel.html';
         return;
     }
-
+    
     // Mapeamento de todos os elementos da página
     const backButton = document.querySelector('.back-button');
     const eventTitleEl = document.getElementById('eventTitle');
@@ -63,6 +62,11 @@ function initPainelEvento(user) {
     const btnExportAll = document.getElementById('btnExportAll');
     const exportStatus = document.getElementById('exportStatus');
     const searchPendingGuestsInput = document.getElementById('searchPendingGuests');
+    const qrXInput = document.getElementById('qrX');
+    const qrYInput = document.getElementById('qrY');
+    const qrWidthInput = document.getElementById('qrWidth');
+    const qrHeightInput = document.getElementById('qrHeight');
+
 
     if(backButton) backButton.href = 'painel.html';
 
@@ -99,6 +103,12 @@ function initPainelEvento(user) {
             }
             if (data.artTemplateUrl) {
                 artTemplateUrl = data.artTemplateUrl;
+                if (data.qrCodePosition) {
+                    if (qrXInput) qrXInput.value = data.qrCodePosition.x;
+                    if (qrYInput) qrYInput.value = data.qrCodePosition.y;
+                    if (qrWidthInput) qrWidthInput.value = data.qrCodePosition.width;
+                    if (qrHeightInput) qrHeightInput.value = data.qrCodePosition.height;
+                }
             }
             checkArtTemplateState();
         }
@@ -143,6 +153,11 @@ function initPainelEvento(user) {
 
         if(uploadStatus) uploadStatus.textContent = 'Enviando...';
         if(btnUploadArt) btnUploadArt.disabled = true;
+        
+        const qrX = qrXInput.value;
+        const qrY = qrYInput.value;
+        const qrWidth = qrWidthInput.value;
+        const qrHeight = qrHeightInput.value;
 
         const storage = firebase.storage();
         const artRef = storage.ref(`event_templates/${eventId}/art_template.jpg`);
@@ -152,7 +167,13 @@ function initPainelEvento(user) {
             const downloadURL = await artRef.getDownloadURL();
             
             await db.collection('eventos').doc(eventId).update({
-                artTemplateUrl: downloadURL
+                artTemplateUrl: downloadURL,
+                qrCodePosition: {
+                    x: parseInt(qrX),
+                    y: parseInt(qrY),
+                    width: parseInt(qrWidth),
+                    height: parseInt(qrHeight)
+                }
             });
             
             if(uploadStatus) uploadStatus.textContent = 'Upload concluído com sucesso!';
@@ -174,7 +195,8 @@ function initPainelEvento(user) {
             try {
                 await fileRef.delete();
                 await db.collection('eventos').doc(eventId).update({
-                    artTemplateUrl: null
+                    artTemplateUrl: null,
+                    qrCodePosition: null
                 });
                 artTemplateUrl = null;
                 checkArtTemplateState();
@@ -226,11 +248,10 @@ function initPainelEvento(user) {
             templateImg.crossOrigin = "anonymous";
             templateImg.src = artTemplateUrl;
 
-            // Espera a imagem carregar com um timeout de 30 segundos
             await new Promise((resolve, reject) => {
                 const timeoutId = setTimeout(() => {
                     reject(new Error("Timeout ao carregar a imagem do template."));
-                }, 30000); // 30 segundos de timeout
+                }, 30000);
                 
                 templateImg.onload = () => {
                     clearTimeout(timeoutId);
@@ -249,7 +270,13 @@ function initPainelEvento(user) {
             ctx.drawImage(templateImg, 0, 0);
 
             const qrCodeValue = guestData.qrCode;
-            const qrCodeSize = 415; 
+            const eventDoc = await db.collection('eventos').doc(eventId).get();
+            const qrCodePosition = eventDoc.exists && eventDoc.data().qrCodePosition ? eventDoc.data().qrCodePosition : {
+                x: 337,
+                y: 1257,
+                width: 415,
+                height: 415
+            };
             
             const qrCodeImg = new Image();
             qrCodeImg.src = qrCodeValue;
@@ -259,19 +286,16 @@ function initPainelEvento(user) {
                 qrCodeImg.onerror = reject;
             });
             
-            const position_x = 337;
-            const position_y = 1257;
-
             const qrCodeResized = await new Promise(resolve => {
                 const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = qrCodeSize;
-                tempCanvas.height = qrCodeSize;
+                tempCanvas.width = qrCodePosition.width;
+                tempCanvas.height = qrCodePosition.height;
                 const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(qrCodeImg, 0, 0, qrCodeSize, qrCodeSize);
+                tempCtx.drawImage(qrCodeImg, 0, 0, qrCodePosition.width, qrCodePosition.height);
                 resolve(tempCanvas);
             });
             
-            ctx.drawImage(qrCodeResized, position_x, position_y);
+            ctx.drawImage(qrCodeResized, qrCodePosition.x, qrCodePosition.y);
 
             const finalImageUrl = canvas.toDataURL('image/png');
             generatedArtBlob = await (await fetch(finalImageUrl)).blob();
@@ -343,6 +367,7 @@ function initPainelEvento(user) {
 
         const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
         const querySnapshot = await convidadosRef.get();
+        const eventDoc = await db.collection('eventos').doc(eventId).get();
 
         if (querySnapshot.empty) {
             if(exportStatus) exportStatus.textContent = "Nenhum convidado encontrado.";
@@ -350,6 +375,21 @@ function initPainelEvento(user) {
             if(btnExportAll) btnExportAll.style.display = 'block';
             return;
         }
+
+        if (!eventDoc.exists || !eventDoc.data().artTemplateUrl) {
+            if(exportStatus) exportStatus.textContent = "Erro: Template de arte não encontrado para este evento.";
+            if(exportControls) exportControls.style.display = 'none';
+            if(btnExportAll) btnExportAll.style.display = 'block';
+            return;
+        }
+        
+        const templateImageUrl = eventDoc.data().artTemplateUrl;
+        const qrCodePosition = eventDoc.data().qrCodePosition || {
+            x: 337,
+            y: 1257,
+            width: 415,
+            height: 415
+        };
 
         const zip = new JSZip();
         const totalGuests = querySnapshot.docs.length;
@@ -367,22 +407,35 @@ function initPainelEvento(user) {
             try {
                 if(exportStatus) exportStatus.textContent = `Gerando convite para: ${guestName} (${processedCount + 1}/${totalGuests})`;
 
-                const response = await fetch(GENERATE_ART_FUNCTION_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        eventId: eventId,
-                        nome: guestName
-                    })
+                const templateImg = new Image();
+                templateImg.crossOrigin = "anonymous";
+                templateImg.src = templateImageUrl;
+                await new Promise(resolve => templateImg.onload = resolve);
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = templateImg.width;
+                canvas.height = templateImg.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(templateImg, 0, 0);
+
+                const qrCodeImg = new Image();
+                qrCodeImg.src = guestData.qrCode;
+                await new Promise(resolve => qrCodeImg.onload = resolve);
+                
+                const qrCodeResized = await new Promise(resolve => {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = qrCodePosition.width;
+                    tempCanvas.height = qrCodePosition.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(qrCodeImg, 0, 0, qrCodePosition.width, qrCodePosition.height);
+                    resolve(tempCanvas);
                 });
 
-                if (!response.ok) {
-                    throw new Error('Erro ao gerar a arte para ' + guestName);
-                }
-
-                const blob = await response.blob();
+                ctx.drawImage(qrCodeResized, qrCodePosition.x, qrCodePosition.y);
+                
+                const finalBlob = await (await fetch(canvas.toDataURL('image/png'))).blob();
                 const fileName = `${guestName}_Convite.png`.replace(/[\\/:*?"<>|]/g, '_');
-                zip.file(fileName, blob);
+                zip.file(fileName, finalBlob);
 
             } catch (error) {
                 console.error("Erro ao gerar convite para " + guestName + ":", error);
@@ -420,6 +473,13 @@ function initPainelEvento(user) {
     });
 
     if(btnExportAll) btnExportAll.addEventListener('click', exportAllArts);
+    if(btnCancelExport) btnCancelExport.addEventListener('click', () => {
+        isExportCancelled = true;
+        if(exportStatus) exportStatus.textContent = "Exportação cancelada.";
+        if(exportControls) exportControls.style.display = 'none';
+        if(btnExportAll) btnExportAll.style.display = 'block';
+    });
+
 
     db.collection('eventos').doc(eventId).collection('convidados').onSnapshot(snapshot => {
         const convidados = [];
@@ -434,7 +494,7 @@ function initPainelEvento(user) {
         if(pendingCountEl) pendingCountEl.textContent = pendentes.length;
 
         renderList(confirmedListEl, confirmados.slice(0, MAX_ITEMS), confirmados.length, true);
-        renderList(pendingListEl, pendentes.slice(0, MAX_ITEMS), pendentes.length, false);
+        renderPendingList(pendentes.slice(0, MAX_ITEMS));
 
         if (convidados.length > 0 && btnExportAll) {
             btnExportAll.style.display = 'block';
@@ -442,7 +502,7 @@ function initPainelEvento(user) {
             btnExportAll.style.display = 'none';
         }
     });
-    
+
     function renderList(listElement, data, totalCount, isConfirmed) {
         if(!listElement) return;
         listElement.innerHTML = '';

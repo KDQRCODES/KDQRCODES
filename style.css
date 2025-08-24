@@ -1326,18 +1326,21 @@ button:hover {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
+
+
+/* Estilos do botão de exclusão */
 .delete-button {
     padding: 10px 15px;
-    background-color: #dc3545; /* Vermelho padrão */
+    background-color: #dc3545;
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 50px;
     cursor: pointer;
     transition: background-color 0.2s ease-in-out;
 }
 
 .delete-button:hover {
-    background-color: #c82333; /* Vermelho mais escuro no hover */
+    background-color: #c82333;
 }
 
 .confirmed-item {
@@ -1493,6 +1496,37 @@ button:hover {
     margin: 0 auto;
 }
 
+
+/* Estilo para agrupar os campos de coordenada do QR Code */
+.coordinates-input-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 15px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+}
+
+.coordinates-input-group .input-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.coordinates-input-group .input-wrapper label {
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+.coordinates-input-group .input-wrapper input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
 /* Estilos do preview da arte */
 .art-preview-container {
     display: flex;
@@ -1514,21 +1548,6 @@ button:hover {
     border: 2px solid #ccc;
 }
 
-/* Estilos do botão de exclusão */
-.delete-button {
-    background-color: #dc3545; /* Cor vermelha para indicar exclusão */
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 50px; /* Botão arredondado */
-    cursor: pointer;
-    font-weight: bold;
-    transition: all 0.3s ease;
-}
-
-.delete-button:hover {
-    background-color: #c82333;
-}
 
 
 

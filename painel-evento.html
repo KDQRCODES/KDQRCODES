@@ -33,13 +33,37 @@
             <p class="section-subtitle">Envie uma imagem de template para os convites.</p>
             <div id="artPreviewContainer" class="art-preview-container" style="display:none;">
                 <img id="artPreview" src="" alt="Arte do Evento" class="art-preview">
-                <button id="btnDeleteArt" class="delete-button">Excluir Arte</button>
-                <div id="artUploadStatus"></div>
+                <div class="art-controls">
+                    <button id="btnDeleteArt" class="delete-button">Excluir Arte</button>
+                    <div id="artUploadStatus"></div>
+                </div>
             </div>
             <div id="artUploadContainer" class="upload-area">
-                <input type="file" id="artFileInput" accept="image/png, image/jpeg" style="display: none;">
-                <button id="btnSelectArt" class="my-form__button">Selecionar Imagem</button>
-                <p id="artFileName" class="muted"></p>
+                <div class="input-group">
+                    <input type="file" id="artFileInput" accept="image/png, image/jpeg" style="display: none;">
+                    <button id="btnSelectArt" class="my-form__button">Selecionar Imagem</button>
+                    <p id="artFileName" class="muted"></p>
+                </div>
+
+                <div class="coordinates-input-group">
+                    <div class="input-wrapper">
+                        <input type="number" id="qrX" placeholder="Posição X" value="337">
+                        <label for="qrX">Posição X</label>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="number" id="qrY" placeholder="Posição Y" value="1257">
+                        <label for="qrY">Posição Y</label>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="number" id="qrWidth" placeholder="Largura do QR" value="415">
+                        <label for="qrWidth">Largura</label>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="number" id="qrHeight" placeholder="Altura do QR" value="415">
+                        <label for="qrHeight">Altura</label>
+                    </div>
+                </div>
+                
                 <button id="btnUploadArt" class="my-form__button" style="display:none;">Fazer Upload</button>
                 <div id="uploadStatus"></div>
             </div>
