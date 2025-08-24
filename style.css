@@ -1497,7 +1497,7 @@ button:hover {
 }
 
 
-/* Estilo para agrupar os campos de coordenada do QR Code */
+/* Estilo para agrupar os campos de coordenada do QR Code  */
 .coordinates-input-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
