@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCreate = document.getElementById('btnCreate');
     const togglePassword = document.getElementById('togglePassword');
 
-    // Lógica para mostrar/ocultar senha
     if (togglePassword) {
         togglePassword.addEventListener('click', function () {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -33,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
             createSuccess.textContent = '';
             btnCreate.disabled = true;
 
-            // VALIDAÇÃO DE SENHA AJUSTADA
             if (password.length < 6) {
                 createError.textContent = 'A senha deve ter no mínimo 6 caracteres.';
                 btnCreate.disabled = false;
@@ -41,15 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Usa a sintaxe de compatibilidade do Firestore
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
 
-                // Usa a sintaxe de compatibilidade do Firestore
                 await db.collection('usuarios').doc(userCredential.user.uid).set({
                     nome: name,
                     email: email,
                     tipo: userType,
-                    // Usa a sintaxe de compatibilidade para serverTimestamp
                     criadoEm: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
