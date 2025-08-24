@@ -1,5 +1,4 @@
 // Nenhum import é necessário aqui
-
 document.addEventListener('DOMContentLoaded', () => {
     // Usa o objeto 'auth' global definido em firebase-config.js
     auth.onAuthStateChanged(user => {
@@ -13,12 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Define o número máximo de itens a serem mostrados inicialmente
 const MAX_ITEMS = 10;
-// URL da sua Cloud Function
+// URL da sua Cloud Function (mantida por segurança, mas não mais usada)
 const GENERATE_ART_FUNCTION_URL = 'https://us-central1-kd-qr-codes-checkin-eventos.cloudfunctions.net/generateArt';
 
 let artTemplateUrl = null;
 let generatedArtBlob = null;
-let isExportCancelled = false; 
+let isExportCancelled = false;
 let currentGuestId = null;
 let allPendingGuests = [];
 
@@ -31,7 +30,7 @@ function initPainelEvento(user) {
         window.location.href = 'painel.html';
         return;
     }
-    
+
     // Mapeamento de todos os elementos da página
     const backButton = document.querySelector('.back-button');
     const eventTitleEl = document.getElementById('eventTitle');
@@ -412,7 +411,7 @@ function initPainelEvento(user) {
         }
     }
 
-    if(searchPendingGuests) searchPendingGuests.addEventListener('input', (e) => {
+    if(searchPendingGuestsInput) searchPendingGuestsInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         const filteredGuests = allPendingGuests.filter(guest => 
             guest.nome.toLowerCase().includes(searchTerm)
@@ -557,6 +556,40 @@ function initPainelEvento(user) {
             btnExportAll.style.display = 'none';
         }
     });
+
+    function renderList(listElement, data, totalCount, isConfirmed) {
+        if(!listElement) return;
+        listElement.innerHTML = '';
+
+        if (data.length === 0) {
+            const message = isConfirmed ? 'Nenhum check-in confirmado ainda.' : 'Todos os convidados chegaram!';
+            listElement.innerHTML = `<li class="muted">${message}</li>`;
+        } else {
+            data.forEach(c => {
+                const li = document.createElement('li');
+                if (isConfirmed) {
+                    li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
+                    li.classList.add('confirmed-item');
+                } else {
+                    li.textContent = c.nome;
+                    li.classList.add('pending-item');
+                    li.addEventListener('click', () => displayArtModal(c));
+                }
+                listElement.appendChild(li);
+            });
+        }
+
+        if (totalCount > MAX_ITEMS) {
+            const btn = document.createElement('button');
+            btn.textContent = `Mostrar todos os ${totalCount}`;
+            btn.className = 'show-all-btn';
+            btn.onclick = () => {
+                const fullData = isConfirmed ? convidados.filter(c => c.checkin) : allPendingGuests;
+                renderFullList(listElement, fullData, isConfirmed);
+            };
+            listElement.appendChild(btn);
+        }
+    }
 
     function renderFullList(listElement, data, isConfirmed = false) {
         if(!listElement) return;
