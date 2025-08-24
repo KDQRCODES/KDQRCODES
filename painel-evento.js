@@ -16,8 +16,6 @@ const MAX_ITEMS = 10;
 // URL da sua Cloud Function
 const GENERATE_ART_FUNCTION_URL = 'https://us-central1-kd-qr-codes-checkin-eventos.cloudfunctions.net/generateArt';
 
-const searchPendingGuests = document.getElementById('searchPendingGuests');
-
 let artTemplateUrl = null;
 let generatedArtBlob = null;
 let isExportCancelled = false; 
@@ -33,19 +31,18 @@ function initPainelEvento(user) {
         window.location.href = 'painel.html';
         return;
     }
-
+    
+    // Mapeamento de todos os elementos da página
     const backButton = document.querySelector('.back-button');
     const eventTitleEl = document.getElementById('eventTitle');
     const eventCreatorNameEl = document.getElementById('eventCreatorName');
     const eventCreatedAtEl = document.getElementById('eventCreatedAt');
     const eventDateEl = document.getElementById('eventDate');
     const btnEditDate = document.getElementById('btnEditDate');
-    
     const confirmedCountEl = document.getElementById('confirmedCount');
     const confirmedListEl = document.getElementById('confirmedList');
     const pendingCountEl = document.getElementById('pendingCount');
     const pendingListEl = document.getElementById('pendingList');
-    
     const qrcodeDisplay = document.getElementById('qrcodeDisplay');
     const closeQrcodeModal = document.getElementById('closeQrcodeModal');
     const guestNameDisplay = document.getElementById('guestNameDisplay');
@@ -53,7 +50,6 @@ function initPainelEvento(user) {
     const downloadQrcodeOnlyBtn = document.getElementById('downloadQrcodeOnlyBtn');
     const downloadFullArtBtn = document.getElementById('downloadFullArtBtn');
     const btnDeleteGuest = document.getElementById('btnDeleteGuest');
-    
     const artPreviewContainer = document.getElementById('artPreviewContainer');
     const artPreview = document.getElementById('artPreview');
     const btnDeleteArt = document.getElementById('btnDeleteArt');
@@ -63,16 +59,14 @@ function initPainelEvento(user) {
     const artFileName = document.getElementById('artFileName');
     const btnUploadArt = document.getElementById('btnUploadArt');
     const uploadStatus = document.getElementById('uploadStatus');
-
     const exportControls = document.getElementById('exportControls');
     const btnCancelExport = document.getElementById('btnCancelExport');
     const btnExportAll = document.getElementById('btnExportAll');
     const exportStatus = document.getElementById('exportStatus');
-
     const searchPendingGuestsInput = document.getElementById('searchPendingGuests');
 
     if(backButton) backButton.href = 'painel.html';
-    
+
     loadEventDetails();
 
     function checkArtTemplateState() {
@@ -87,7 +81,7 @@ function initPainelEvento(user) {
             if(btnUploadArt) btnUploadArt.style.display = 'none';
         }
     }
-    
+
     async function loadEventDetails() {
         const docRef = db.collection('eventos').doc(eventId);
         const docSnap = await docRef.get();
@@ -423,7 +417,7 @@ function initPainelEvento(user) {
         const filteredGuests = allPendingGuests.filter(guest => 
             guest.nome.toLowerCase().includes(searchTerm)
         );
-        renderPendingList(filteredGuests, pendentes.length > MAX_ITEMS);
+        renderPendingList(filteredGuests);
     });
 
     if(btnExportAll) btnExportAll.addEventListener('click', exportAllArts);
@@ -483,6 +477,86 @@ function initPainelEvento(user) {
             listElement.appendChild(btn);
         }
     }
+
+    function renderFullList(listElement, data, isConfirmed = false) {
+        if(!listElement) return;
+        listElement.innerHTML = '';
+        data.forEach(c => {
+            const li = document.createElement('li');
+            if (isConfirmed) {
+                li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
+                li.classList.add('confirmed-item');
+            } else {
+                li.textContent = c.nome;
+                li.classList.add('pending-item');
+                li.addEventListener('click', () => displayArtModal(c));
+            }
+            listElement.appendChild(li);
+        });
+        const btn = document.createElement('button');
+        btn.textContent = `Mostrar menos`;
+        btn.className = 'show-all-btn';
+        btn.onclick = () => { location.reload(); };
+        listElement.appendChild(btn);
+    }
+
+    function renderPendingList(data) {
+        if(!pendingListEl) return;
+        pendingListEl.innerHTML = '';
+
+        if (data.length === 0) {
+            pendingListEl.innerHTML = '<li class="muted">Nenhum convidado encontrado.</li>';
+        } else {
+            data.forEach(c => {
+                const li = document.createElement('li');
+                li.textContent = c.nome;
+                li.classList.add('pending-item');
+                li.addEventListener('click', () => displayArtModal(c));
+                pendingListEl.appendChild(li);
+            });
+        }
+    }
+
+    if(searchPendingGuestsInput) {
+        searchPendingGuestsInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredGuests = allPendingGuests.filter(guest => 
+                guest.nome.toLowerCase().includes(searchTerm)
+            );
+            renderPendingList(filteredGuests);
+        });
+    }
+
+    if(btnExportAll) btnExportAll.addEventListener('click', exportAllArts);
+    if(btnCancelExport) btnCancelExport.addEventListener('click', () => {
+        isExportCancelled = true;
+        if(exportStatus) exportStatus.textContent = "Exportação cancelada.";
+        if(exportControls) exportControls.style.display = 'none';
+        if(btnExportAll) btnExportAll.style.display = 'block';
+    });
+
+
+    db.collection('eventos').doc(eventId).collection('convidados').onSnapshot(snapshot => {
+        const convidados = [];
+        snapshot.forEach(d => convidados.push({ id: d.id, ...d.data() }));
+
+        const confirmados = convidados.filter(c => c.checkin === true);
+        const pendentes = convidados.filter(c => c.checkin === false || !c.hasOwnProperty('checkin'));
+
+        allPendingGuests = pendentes;
+
+        if(confirmedCountEl) confirmedCountEl.textContent = confirmados.length;
+        if(pendingCountEl) pendingCountEl.textContent = pendentes.length;
+
+        renderList(confirmedListEl, confirmados.slice(0, MAX_ITEMS), confirmados.length, true);
+        renderPendingList(pendentes.slice(0, MAX_ITEMS));
+
+        if (convidados.length > 0 && btnExportAll) {
+            btnExportAll.style.display = 'block';
+        } else if(btnExportAll) {
+            btnExportAll.style.display = 'none';
+        }
+    });
 
     function renderFullList(listElement, data, isConfirmed = false) {
         if(!listElement) return;
