@@ -1,9 +1,7 @@
-import { db, auth } from "./firebase-config.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { doc, getDoc, updateDoc, collection, query, getDocs, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+// Nenhum import é necessário aqui
 document.addEventListener('DOMContentLoaded', () => {
-    onAuthStateChanged(auth, user => {
+    // Usa o objeto 'auth' global definido em firebase-config.js
+    auth.onAuthStateChanged(user => {
         if (!user) {
             window.location.href = 'login.html';
         } else {
@@ -46,9 +44,12 @@ async function initLeitorPage(user) {
     }
 
     async function loadEvents() {
+        if (!eventSelection) return;
         eventSelection.innerHTML = '<option value="">Carregando eventos...</option>';
-        const eventosRef = collection(db, 'eventos');
-        const querySnapshot = await getDocs(query(eventosRef));
+        
+        // Usa a sintaxe de compatibilidade
+        const eventosRef = db.collection('eventos');
+        const querySnapshot = await eventosRef.get();
 
         if (querySnapshot.empty) {
             eventSelection.innerHTML = '<option value="">Nenhum evento encontrado</option>';
@@ -67,8 +68,10 @@ async function initLeitorPage(user) {
 
     async function setupUserMenu(user) {
         if (user) {
-            const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-            if (userDoc.exists()) {
+            // Usa a sintaxe de compatibilidade
+            const userDoc = await db.collection('usuarios').doc(user.uid).get();
+            // Correção para .exists
+            if (userDoc.exists) {
                 const userData = userDoc.data();
                 if(userNameSpan) userNameSpan.textContent = userData.nome;
                 if(userTypeSpan) userTypeSpan.textContent = userData.tipo;
@@ -79,6 +82,7 @@ async function initLeitorPage(user) {
     }
 
     async function updateNavLinks(userType) {
+        if (!mainMenu) return;
         const mainPanelLink = mainMenu.querySelector('a[href="painel.html"]');
         if (mainPanelLink) {
             if (userType === 'administrador') {
@@ -101,17 +105,15 @@ async function initLeitorPage(user) {
                 return;
             }
             
-            // NOVO: Faz uma consulta por nome, em vez de usar o nome como ID
-            const convidadosRef = collection(db, 'eventos', eventId, 'convidados');
-            const q = query(convidadosRef, where('nome', '==', nome));
-            const querySnapshot = await getDocs(q);
+            // Usa a sintaxe de compatibilidade
+            const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
+            const querySnapshot = await convidadosRef.where('nome', '==', nome).get();
 
             if (querySnapshot.empty) {
                 showStatus(`Convidado "${nome}" não encontrado.`, 'error');
                 return;
             }
 
-            // Pega o primeiro documento encontrado (assumindo que os nomes são únicos)
             const convidadoDoc = querySnapshot.docs[0];
             const convidadoRef = convidadoDoc.ref;
             const convidadoData = convidadoDoc.data();
@@ -120,9 +122,10 @@ async function initLeitorPage(user) {
                 showStatus(`"${nome}" já fez check-in.`, 'error');
             } else {
                 if (!isTestMode) {
-                    await updateDoc(convidadoRef, { 
+                    // Usa a sintaxe de compatibilidade
+                    await convidadoRef.update({ 
                         checkin: true,
-                        checkinAt: serverTimestamp() // ADICIONADO: Para registrar a data e hora do check-in
+                        checkinAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
                 showStatus(`✅ Check-in de "${nome}" realizado com sucesso!`, 'success');
@@ -133,12 +136,15 @@ async function initLeitorPage(user) {
         }
         
         // Mantém a exibição da mensagem por 3 segundos
-        qrCodeScanner.pause();
-        setTimeout(() => qrCodeScanner.resume(), 3000);
+        if (qrCodeScanner) {
+            qrCodeScanner.pause();
+            setTimeout(() => qrCodeScanner.resume(), 3000);
+        }
     };
 
     const onScanError = (error) => {
         // Ignora erros de leitura para evitar mensagens de erro constantes
+        // console.error("Erro de leitura:", error);
     };
 
     const stopScanner = () => {
@@ -152,40 +158,49 @@ async function initLeitorPage(user) {
         }
     };
     
-    btnTestReader.addEventListener('click', () => {
-        const eventId = eventSelection.value;
-        if (!eventId) {
-            alert('Por favor, selecione um evento primeiro.');
-            return;
-        }
+    if (btnTestReader) {
+        btnTestReader.addEventListener('click', () => {
+            const eventId = eventSelection.value;
+            if (!eventId) {
+                alert('Por favor, selecione um evento primeiro.');
+                return;
+            }
+    
+            isTestMode = true;
+            currentEventId = eventId;
+            showStatus('Modo de teste ativado. Nenhuma alteração será salva.', 'info');
+            startScanner();
+        });
+    }
 
-        isTestMode = true;
-        currentEventId = eventId;
-        showStatus('Modo de teste ativado. Nenhuma alteração será salva.', 'info');
-        startScanner();
-    });
-
-    btnStartReader.addEventListener('click', () => {
-        const eventId = eventSelection.value;
-        if (!eventId) {
-            alert('Por favor, selecione um evento primeiro.');
-            return;
-        }
-
-        isTestMode = false;
-        currentEventId = eventId;
-        showStatus('Leitor ativado em modo de produção. Os check-ins serão salvos.', 'info');
-        startScanner();
-    });
+    if (btnStartReader) {
+        btnStartReader.addEventListener('click', () => {
+            const eventId = eventSelection.value;
+            if (!eventId) {
+                alert('Por favor, selecione um evento primeiro.');
+                return;
+            }
+    
+            isTestMode = false;
+            currentEventId = eventId;
+            showStatus('Leitor ativado em modo de produção. Os check-ins serão salvos.', 'info');
+            startScanner();
+        });
+    }
     
     function startScanner() {
         stopScanner();
-
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
         const cameraId = cameraSelection.value;
 
-        qrCodeScanner = new Html5QrcodeScanner("reader", config, true);
-        qrCodeScanner.render(onScanSuccess, onScanError);
+        // O 'Html5QrcodeScanner' não é global. O correto é criar uma instância.
+        const html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(cameraId, config, onScanSuccess, onScanError).then(instance => {
+            qrCodeScanner = instance;
+        }).catch(err => {
+            console.error("Erro ao iniciar leitor:", err);
+            showStatus("Não foi possível iniciar o leitor. Verifique as permissões da câmera.", 'error');
+        });
     }
     
     // Carregar eventos e câmeras ao iniciar a página
@@ -205,13 +220,17 @@ async function initLeitorPage(user) {
         console.error("Erro ao buscar câmeras:", err);
     });
 
-    if(userProfileSummary) userProfileSummary.addEventListener('click', () => {
-        if(userDropdown) userDropdown.classList.toggle('show');
-    });
+    if(userProfileSummary) {
+        userProfileSummary.addEventListener('click', () => {
+            if(userDropdown) userDropdown.classList.toggle('show');
+        });
+    }
 
-    if(userDropdownLogoutBtn) userDropdownLogoutBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await signOut(auth);
-        window.location.href = 'login.html';
-    });
+    if(userDropdownLogoutBtn) {
+        userDropdownLogoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await auth.signOut();
+            window.location.href = 'login.html';
+        });
+    }
 }

@@ -10,9 +10,6 @@
 
 <body class="body-login">
     <form class="my-form" id="loginForm">
-        <div class="back-button-container">
-            <a href="index.html" class="back-button">← Voltar</a>
-        </div>
         <div class="login-welcome-row">
             <a href="#" title="Logo">
                 <img src="images/LOGO.jpg" alt="Logo" class="logo">
@@ -22,10 +19,8 @@
         </div>
         
         <div class="input__wrapper">
-            <!-- Corrigido: Alterado o rótulo para "Login:" -->
             <input type="text" id="email" name="email" class="input__field" placeholder="Seu Email ou Nome de Usuário" required>
             <label for="email" class="input__label">Login:</label>
-            <!-- Corrigido: Alterado o ícone para "fa-user" -->
             <i class="fa-solid fa-user input__icon email-icon"></i>
         </div>
         
@@ -40,6 +35,12 @@
         </button>
         <div id="loginError" style="color:red; text-align:center; margin-top: 10px;"></div>
     </form>
-    <script type="module" src="login.js"></script>
-</body>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+    <script src="firebase-config.js"></script>
+    <script src="login.js"></script>
+    </body>
 </html>

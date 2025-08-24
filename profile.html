@@ -41,10 +41,12 @@
                 <div class="input__wrapper">
                     <input type="password" id="currentPassword" class="input__field" placeholder="Senha Atual" required>
                     <label for="currentPassword" class="input__label">Senha Atual:</label>
+                    <i class="fa-solid fa-lock input__icon password-icon" id="toggleCurrentPassword"></i>
                 </div>
                 <div class="input__wrapper">
                     <input type="password" id="newPassword" class="input__field" placeholder="Nova Senha (min. 6 caracteres)" required>
                     <label for="newPassword" class="input__label">Nova Senha:</label>
+                    <i class="fa-solid fa-lock input__icon password-icon" id="toggleNewPassword"></i>
                 </div>
                 <button type="submit" class="my-form__button">Atualizar Senha</button>
                 <div id="passwordMessage"></div>
@@ -52,7 +54,11 @@
         </div>
     </div>
 
-    <script type="module" src="profile.js"></script>
-    <script type="module" src="firebase-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    
+    <script src="firebase-config.js"></script>
+    <script src="profile.js"></script>
 </body>
 </html>

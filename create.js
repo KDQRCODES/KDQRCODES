@@ -1,6 +1,4 @@
-import { auth, db } from "./firebase-config.js";
-import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// Nenhum import é necessário aqui
 
 document.addEventListener('DOMContentLoaded', () => {
     const createForm = document.getElementById('createForm');
@@ -44,15 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Cria o usuário no Firebase Authentication
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                // CORRIGIDO: Usa auth.createUserWithEmailAndPassword
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
 
-                // Salva informações adicionais no Firestore
-                await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
+                // CORRIGIDO: Usa a sintaxe de compatibilidade do Firestore
+                await db.collection('usuarios').doc(userCredential.user.uid).set({
                     nome: name,
                     email: email,
                     tipo: userType,
-                    criadoEm: serverTimestamp()
+                    // CORRIGIDO: Usa a sintaxe de compatibilidade para serverTimestamp
+                    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
                 createSuccess.textContent = `Usuário ${name} cadastrado com sucesso!`;

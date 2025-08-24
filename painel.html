@@ -37,7 +37,6 @@
             </div>
         </div>
 
-        <!-- HAMBURGER -->
         <div class="hamburger" id="hamburger">
             <div class="bar"></div>
             <div class="bar"></div>
@@ -68,8 +67,12 @@
         </div>
     </main>
 
-    <script type="module" src="painel.js"></script>
-
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    
+    <script src="firebase-config.js"></script>
+    <script src="painel.js"></script>
     <script>
         // CONTROLAR HAMBURGER
         const hamburger = document.getElementById('hamburger');

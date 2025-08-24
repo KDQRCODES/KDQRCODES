@@ -1,24 +1,8 @@
-import { db, auth } from "./firebase-config.js";
-import {
-    collection,
-    query,
-    where,
-    getDocs,
-    addDoc,
-    doc,
-    getDoc,
-    onSnapshot,
-    orderBy,
-    serverTimestamp,
-    updateDoc,
-    deleteDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-
+// Nenhum import é necessário aqui
 
 document.addEventListener('DOMContentLoaded', () => {
-    onAuthStateChanged(auth, user => {
+    // Usa o objeto 'auth' global definido em firebase-config.js
+    auth.onAuthStateChanged(user => {
         if (!user) {
             window.location.href = 'login.html';
         } else {
@@ -36,7 +20,7 @@ const searchPendingGuests = document.getElementById('searchPendingGuests');
 
 let artTemplateUrl = null;
 let generatedArtBlob = null;
-let isExportCancelled = false; // NOVO: Flag para cancelamento
+let isExportCancelled = false; 
 let currentGuestId = null;
 let allPendingGuests = [];
 
@@ -105,15 +89,17 @@ function initPainelEvento(user) {
     }
     
     async function loadEventDetails() {
-        const docSnap = await getDoc(doc(db, 'eventos', eventId));
-        if (docSnap.exists()) {
+        const docRef = db.collection('eventos').doc(eventId);
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists) {
             const data = docSnap.data();
             if(eventTitleEl) eventTitleEl.textContent = data.nome || 'Painel do Evento';
             if(eventCreatedAtEl) eventCreatedAtEl.textContent = data.criadoEm?.toDate ? data.criadoEm.toDate().toLocaleString() : 'Não informado';
             
             if (data.criadoPor) {
-                const userDoc = await getDoc(doc(db, 'usuarios', data.criadoPor));
-                if(eventCreatorNameEl) eventCreatorNameEl.textContent = userDoc.exists() ? userDoc.data().nome : 'Usuário Removido';
+                const userDoc = await db.collection('usuarios').doc(data.criadoPor).get();
+                if(eventCreatorNameEl) eventCreatorNameEl.textContent = userDoc.exists ? userDoc.data().nome : 'Usuário Removido';
             }
             if (data.dataEvento) {
                 if(eventDateEl) eventDateEl.textContent = data.dataEvento.toDate().toLocaleDateString();
@@ -132,7 +118,7 @@ function initPainelEvento(user) {
             const dataObjeto = new Date(ano, mes - 1, dia);
 
             if (dia && mes && ano && !isNaN(dataObjeto.getTime())) {
-                await updateDoc(doc(db, 'eventos', eventId), {
+                await db.collection('eventos').doc(eventId).update({
                     dataEvento: dataObjeto
                 });
                 if(eventDateEl) eventDateEl.textContent = novaData;
@@ -165,14 +151,14 @@ function initPainelEvento(user) {
         if(uploadStatus) uploadStatus.textContent = 'Enviando...';
         if(btnUploadArt) btnUploadArt.disabled = true;
 
-        const storage = getStorage();
-        const artRef = ref(storage, `event_templates/${eventId}/art_template.jpg`);
+        const storage = firebase.storage();
+        const artRef = storage.ref(`event_templates/${eventId}/art_template.jpg`);
 
         try {
-            await uploadBytes(artRef, file);
-            const downloadURL = await getDownloadURL(artRef);
+            await artRef.put(file);
+            const downloadURL = await artRef.getDownloadURL();
             
-            await updateDoc(doc(db, 'eventos', eventId), {
+            await db.collection('eventos').doc(eventId).update({
                 artTemplateUrl: downloadURL
             });
             
@@ -189,12 +175,12 @@ function initPainelEvento(user) {
 
     if(btnDeleteArt) btnDeleteArt.addEventListener('click', async () => {
         if (confirm("Tem certeza que deseja excluir esta arte?")) {
-            const storage = getStorage();
-            const fileRef = ref(storage, `event_templates/${eventId}/art_template.jpg`);
+            const storage = firebase.storage();
+            const fileRef = storage.ref(`event_templates/${eventId}/art_template.jpg`);
             
             try {
-                await deleteObject(fileRef);
-                await updateDoc(doc(db, 'eventos', eventId), {
+                await fileRef.delete();
+                await db.collection('eventos').doc(eventId).update({
                     artTemplateUrl: null
                 });
                 artTemplateUrl = null;
@@ -223,24 +209,19 @@ function initPainelEvento(user) {
         
         qrcodeDisplay.style.display = 'flex';
 
-        // NOVO: Adiciona o event listener para o botão de exclusão
-        if(btnDeleteGuest) btnDeleteGuest.addEventListener('click', async () => {
+        if(btnDeleteGuest) btnDeleteGuest.onclick = async () => {
             if (confirm(`Tem certeza que deseja excluir o convidado "${guestNameDisplay.textContent}"?`)) {
                 try {
-                    // Acha o ID do documento do convidado no Firebase
-                    const docRef = doc(db, 'eventos', eventId, 'convidados', currentGuestId);
-                    await deleteDoc(docRef);
-
+                    const docRef = db.collection('eventos').doc(eventId).collection('convidados').doc(currentGuestId);
+                    await docRef.delete();
                     alert('Convidado excluído com sucesso!');
                     if(qrcodeDisplay) qrcodeDisplay.style.display = 'none';
-
-                    // O onSnapshot recarregará a lista automaticamente
                 } catch (error) {
                     alert('Erro ao excluir convidado: ' + error.message);
                     console.error("Erro ao excluir convidado:", error);
                 }
             }
-        });
+        };
         
         try {
             if (!artTemplateUrl) {
@@ -249,9 +230,7 @@ function initPainelEvento(user) {
             
             const response = await fetch(GENERATE_ART_FUNCTION_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 mode: 'cors',
                 body: JSON.stringify({
                     eventId: eventId,
@@ -286,10 +265,8 @@ function initPainelEvento(user) {
             };
 
             downloadQrcodeOnlyBtn.onclick = async () => {
-                const tempCanvas = document.createElement('canvas');
-                await QRCode.toCanvas(tempCanvas, guestData.qrCode, { width: 300 });
                 const link = document.createElement('a');
-                link.href = tempCanvas.toDataURL('image/png');
+                link.href = guestData.qrCode; 
                 link.download = `${guestData.nome}_QRCode.png`;
                 document.body.appendChild(link);
                 link.click();
@@ -325,9 +302,7 @@ function initPainelEvento(user) {
     
     async function exportAllArts() {
         const confirmExport = confirm("Isso pode levar alguns minutos. Deseja exportar todos os convites?");
-        if (!confirmExport) {
-            return;
-        }
+        if (!confirmExport) return;
         
         isExportCancelled = false;
         if(exportControls) exportControls.style.display = 'flex';
@@ -335,9 +310,8 @@ function initPainelEvento(user) {
         
         if(exportStatus) exportStatus.textContent = "Iniciando a exportação...";
 
-        const convidadosRef = collection(db, 'eventos', eventId, 'convidados');
-        const q = query(convidadosRef);
-        const querySnapshot = await getDocs(q);
+        const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
+        const querySnapshot = await convidadosRef.get();
 
         if (querySnapshot.empty) {
             if(exportStatus) exportStatus.textContent = "Nenhum convidado encontrado.";
@@ -364,9 +338,7 @@ function initPainelEvento(user) {
 
                 const response = await fetch(GENERATE_ART_FUNCTION_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         eventId: eventId,
                         nome: guestName
@@ -374,7 +346,7 @@ function initPainelEvento(user) {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Erro ao gerar a arte do QR Code para ' + guestName);
+                    throw new Error('Erro ao gerar a arte para ' + guestName);
                 }
 
                 const blob = await response.blob();
@@ -408,19 +380,17 @@ function initPainelEvento(user) {
         }
     }
 
-    searchPendingGuests.addEventListener('input', (e) => {
+    if(searchPendingGuests) searchPendingGuests.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         const filteredGuests = allPendingGuests.filter(guest => 
             guest.nome.toLowerCase().includes(searchTerm)
         );
-        renderPendingList(filteredGuests);
+        renderPendingList(filteredGuests, pendentes.length > MAX_ITEMS);
     });
 
     if(btnExportAll) btnExportAll.addEventListener('click', exportAllArts);
 
-    onSnapshot(collection(db, 'eventos', eventId, 'convidados'), snapshot => {
-        console.log("onSnapshot acionado. Convidados recebidos:", snapshot.docs.length);
-
+    db.collection('eventos').doc(eventId).collection('convidados').onSnapshot(snapshot => {
         const convidados = [];
         snapshot.forEach(d => convidados.push({ id: d.id, ...d.data() }));
 
@@ -432,224 +402,69 @@ function initPainelEvento(user) {
         if(confirmedCountEl) confirmedCountEl.textContent = confirmados.length;
         if(pendingCountEl) pendingCountEl.textContent = pendentes.length;
 
-        const confirmedToDisplay = confirmados.slice(0, MAX_ITEMS);
-        const pendingToDisplay = pendentes.slice(0, MAX_ITEMS);
-
-        if(confirmedListEl) {
-            confirmedListEl.innerHTML = '';
-            if (confirmedToDisplay.length === 0) {
-                confirmedListEl.innerHTML = '<li class="muted">Nenhum check-in confirmado ainda.</li>';
-            } else {
-                confirmedToDisplay.sort((a, b) => b.checkinAt - a.checkinAt).forEach(c => {
-                    const li = document.createElement('li');
-                    li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
-                    li.classList.add('confirmed-item');
-                    confirmedListEl.appendChild(li);
-                });
-            }
-            if (confirmados.length > MAX_ITEMS) {
-                const btn = document.createElement('button');
-                btn.textContent = `Mostrar todos os ${confirmados.length} confirmados`;
-                btn.className = 'show-all-btn';
-                if(btn) btn.onclick = () => { renderFullList(confirmedListEl, confirmados, true); };
-                confirmedListEl.appendChild(btn);
-            }
-        }
-
-        renderPendingList(pendingToDisplay);
-
-        if(pendingListEl) {
-            pendingListEl.innerHTML = '';
-            if (pendingToDisplay.length === 0) {
-                pendingListEl.innerHTML = '<li class="muted">Todos os convidados chegaram!</li>';
-            } else {
-                pendingToDisplay.forEach(c => {
-                    const li = document.createElement('li');
-                    li.textContent = c.nome;
-                    li.classList.add('pending-item');
-                    if(li) li.addEventListener('click', () => displayArtModal(c));
-                    pendingListEl.appendChild(li);
-                });
-            }
-            if (pendentes.length > MAX_ITEMS) {
-                const btn = document.createElement('button');
-                btn.textContent = `Mostrar todos os ${pendentes.length} pendentes`;
-                btn.className = 'show-all-btn';
-                if(btn) btn.onclick = () => { renderFullList(pendingListEl, pendentes); };
-                pendingListEl.appendChild(btn);
-            }
-        }
+        renderList(confirmedListEl, confirmados.slice(0, MAX_ITEMS), confirmados.length, true);
+        renderList(pendingListEl, pendentes.slice(0, MAX_ITEMS), pendentes.length, false);
 
         if (convidados.length > 0 && btnExportAll) {
             btnExportAll.style.display = 'block';
         } else if(btnExportAll) {
             btnExportAll.style.display = 'none';
         }
-
-         if (pendentes.length > MAX_ITEMS) {
-            const btn = document.createElement('button');
-            btn.textContent = `Mostrar todos os ${pendentes.length} pendentes`;
-            btn.className = 'show-all-btn';
-            if(btn) btn.onclick = () => { renderFullList(pendingListEl, pendentes); };
-            pendingListEl.appendChild(btn);
-        }
-
-        function renderPendingList(data) {
-            if(pendingListEl) {
-                pendingListEl.innerHTML = '';
-                if (data.length === 0) {
-                    pendingListEl.innerHTML = '<li class="muted">Nenhum convidado encontrado.</li>';
-                } else {
-                    data.forEach(c => {
-                        const li = document.createElement('li');
-                        li.textContent = c.nome;
-                        li.classList.add('pending-item');
-                        if(li) li.addEventListener('click', () => displayArtModal(c));
-                        pendingListEl.appendChild(li);
-                    });
-                }
-            }
-        }
-
-        // NOVO: Event listener para o botão de pesquisa
-        if(btnSearchGuests) btnSearchGuests.addEventListener('click', () => {
-            const searchTerm = searchPendingGuestsInput.value.toLowerCase().trim();
-            const filteredGuests = allPendingGuests.filter(guest => 
-                guest.nome.toLowerCase().includes(searchTerm)
-            );
-            // NOVO: Renderiza a lista filtrada
-            renderPendingList(filteredGuests);
-        });
-
-        // NOVO: Event listener para o input de pesquisa (atualização em tempo real)
-        if(searchPendingGuestsInput) searchPendingGuestsInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase().trim();
-            const filteredGuests = allPendingGuests.filter(guest => 
-                guest.nome.toLowerCase().includes(searchTerm)
-            );
-            renderPendingList(filteredGuests);
-        });
     });
     
+    function renderList(listElement, data, totalCount, isConfirmed) {
+        if(!listElement) return;
+        listElement.innerHTML = '';
+
+        if (data.length === 0) {
+            const message = isConfirmed ? 'Nenhum check-in confirmado ainda.' : 'Todos os convidados chegaram!';
+            listElement.innerHTML = `<li class="muted">${message}</li>`;
+        } else {
+            data.forEach(c => {
+                const li = document.createElement('li');
+                if (isConfirmed) {
+                    li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
+                    li.classList.add('confirmed-item');
+                } else {
+                    li.textContent = c.nome;
+                    li.classList.add('pending-item');
+                    li.addEventListener('click', () => displayArtModal(c));
+                }
+                listElement.appendChild(li);
+            });
+        }
+
+        if (totalCount > MAX_ITEMS) {
+            const btn = document.createElement('button');
+            btn.textContent = `Mostrar todos os ${totalCount}`;
+            btn.className = 'show-all-btn';
+            btn.onclick = () => {
+                const fullData = isConfirmed ? convidados.filter(c => c.checkin) : allPendingGuests;
+                renderFullList(listElement, fullData, isConfirmed);
+            };
+            listElement.appendChild(btn);
+        }
+    }
+
     function renderFullList(listElement, data, isConfirmed = false) {
         if(!listElement) return;
-
         listElement.innerHTML = '';
         data.forEach(c => {
             const li = document.createElement('li');
-            li.textContent = c.nome;
             if (isConfirmed) {
                 li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
                 li.classList.add('confirmed-item');
             } else {
-                 li.classList.add('pending-item');
-                 if(li) li.addEventListener('click', () => displayArtModal(c));
+                li.textContent = c.nome;
+                li.classList.add('pending-item');
+                li.addEventListener('click', () => displayArtModal(c));
             }
             listElement.appendChild(li);
         });
         const btn = document.createElement('button');
         btn.textContent = `Mostrar menos`;
         btn.className = 'show-all-btn';
-        if(btn) btn.onclick = () => { location.reload(); };
+        btn.onclick = () => { location.reload(); };
         listElement.appendChild(btn);
-    }
-    
-    if(btnExportAll) btnExportAll.addEventListener('click', exportAllArts);
-
-    if(btnCancelExport) btnCancelExport.addEventListener('click', () => {
-        isExportCancelled = true;
-        if(exportStatus) exportStatus.textContent = "Exportação cancelada.";
-        if(exportControls) exportControls.style.display = 'none';
-        if(btnExportAll) btnExportAll.style.display = 'block';
-    });
-
-    function renderPendingList(convidados) {
-        // Limpar a lista e renderizar os itens filtrados
-    }
-
-
-    async function exportAllArts() {
-        const confirmExport = confirm("Isso pode levar alguns minutos. Deseja exportar todos os convites?");
-        if (!confirmExport) {
-            return;
-        }
-        
-        isExportCancelled = false;
-        if(exportControls) exportControls.style.display = 'flex';
-        if(btnExportAll) btnExportAll.style.display = 'none';
-        
-        if(exportStatus) exportStatus.textContent = "Iniciando a exportação...";
-
-        const convidadosRef = collection(db, 'eventos', eventId, 'convidados');
-        const q = query(convidadosRef);
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            if(exportStatus) exportStatus.textContent = "Nenhum convidado encontrado.";
-            if(exportControls) exportControls.style.display = 'none';
-            if(btnExportAll) btnExportAll.style.display = 'block';
-            return;
-        }
-
-        const zip = new JSZip();
-        const totalGuests = querySnapshot.docs.length;
-        let processedCount = 0;
-
-        for (const doc of querySnapshot.docs) {
-            if (isExportCancelled) {
-                if(exportStatus) exportStatus.textContent = "Exportação cancelada.";
-                break;
-            }
-
-            const guestData = doc.data();
-            const guestName = guestData.nome;
-
-            try {
-                if(exportStatus) exportStatus.textContent = `Gerando convite para: ${guestName} (${processedCount + 1}/${totalGuests})`;
-
-                const response = await fetch(GENERATE_ART_FUNCTION_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        eventId: eventId,
-                        nome: guestName
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Erro ao gerar a arte do QR Code para ' + guestName);
-                }
-
-                const blob = await response.blob();
-                const fileName = `${guestName}_Convite.png`.replace(/[\\/:*?"<>|]/g, '_');
-                zip.file(fileName, blob);
-
-            } catch (error) {
-                console.error("Erro ao gerar convite para " + guestName + ":", error);
-            }
-            
-            processedCount++;
-        }
-        
-        if (!isExportCancelled) {
-            if(exportStatus) exportStatus.textContent = "Compactando arquivos...";
-            
-            zip.generateAsync({ type: "blob" }).then(function(content) {
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = `Convites_Evento_${eventId}.zip`;
-                link.click();
-                
-                if(exportStatus) exportStatus.textContent = "Download concluído!";
-            }).catch(error => {
-                if(exportStatus) exportStatus.textContent = "Erro ao compactar arquivos.";
-                console.error("Erro ao compactar:", error);
-            }).finally(() => {
-                if(exportControls) exportControls.style.display = 'none';
-                if(btnExportAll) btnExportAll.style.display = 'block';
-            });
-        }
     }
 }

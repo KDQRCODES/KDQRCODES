@@ -1,8 +1,4 @@
-import { auth, db } from "./firebase-config.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import {
-  collection, query, getDocs, addDoc, doc, deleteDoc, getDoc, orderBy, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// Nenhum import é necessário aqui
 
 document.addEventListener("DOMContentLoaded", () => {
   initAdminPanel();
@@ -31,8 +27,11 @@ function initAdminPanel() {
   const userNameSpan = document.getElementById("userName");
   const userTypeSpan = document.getElementById("userType");
 
-  // Logout correto (id mudou para btnLogoutDropdown)
+  // Logout correto
   const btnLogoutDropdown = document.getElementById("btnLogoutDropdown");
+
+  // Usa os objetos 'auth' e 'db' globais, definidos em firebase-config.js
+  const currentUser = auth.currentUser;
 
   function showAdminPanels() {
     eventsPanel.style.display = "block";
@@ -47,13 +46,16 @@ function initAdminPanel() {
     });
   }
 
-  onAuthStateChanged(auth, async (user) => {
+  auth.onAuthStateChanged(async (user) => {
     if (!user) {
       window.location.href = "login.html";
       return;
     }
-    const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-    if (!userDoc.exists() || userDoc.data().tipo !== "administrador") {
+    const userDocRef = db.collection("usuarios").doc(user.uid);
+    const userDoc = await userDocRef.get();
+
+    // CORRIGIDO: de userDoc.exists() para userDoc.exists
+    if (!userDoc.exists || userDoc.data().tipo !== "administrador") {
       window.location.href = "painel.html";
       return;
     }
@@ -64,16 +66,14 @@ function initAdminPanel() {
     setupUserMenu(user);
   });
 
-  // Logout (dropdown)
   if (btnLogoutDropdown) {
     btnLogoutDropdown.addEventListener("click", async (e) => {
       e.preventDefault();
-      await signOut(auth);
+      await auth.signOut();
       window.location.href = "login.html";
     });
   }
 
-  // Criar evento
   if (btnCreateEvent) {
     btnCreateEvent.addEventListener("click", async () => {
       const nomeEvento = (newEventNameInput.value || "").trim();
@@ -83,9 +83,9 @@ function initAdminPanel() {
         return;
       }
       try {
-        await addDoc(collection(db, "eventos"), {
+        await db.collection("eventos").add({
           nome: nomeEvento,
-          criadoEm: serverTimestamp(),
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
           criadoPor: auth.currentUser.uid,
         });
         newEventNameInput.value = "";
@@ -98,14 +98,15 @@ function initAdminPanel() {
 
   async function getCreatorName(uid) {
     if (!uid) return "Desconhecido";
-    const u = await getDoc(doc(db, "usuarios", uid));
-    return u.exists() ? u.data().nome : "Usuário Removido";
+    const userDoc = await db.collection("usuarios").doc(uid).get();
+    // CORRIGIDO: de u.exists() para u.exists
+    return userDoc.exists ? userDoc.data().nome : "Usuário Removido";
   }
 
   async function loadAllEvents() {
     eventsList.innerHTML = "";
-    const q = query(collection(db, "eventos"), orderBy("criadoEm", "desc"));
-    const snapshot = await getDocs(q);
+    const q = db.collection("eventos").orderBy("criadoEm", "desc");
+    const snapshot = await q.get();
 
     if (snapshot.empty) {
       eventsList.innerHTML = "<li>Nenhum evento criado ainda.</li>";
@@ -128,7 +129,7 @@ function initAdminPanel() {
       li.querySelector(".deleteEvent").addEventListener("click", async (event) => {
         event.stopPropagation();
         if (confirm(`Excluir evento ${ev.nome}?`)) {
-          await deleteDoc(doc(db, "eventos", d.id));
+          await db.collection("eventos").doc(d.id).delete();
           loadAllEvents();
         }
       });
@@ -139,8 +140,8 @@ function initAdminPanel() {
 
   async function loadAllUsers() {
     userList.innerHTML = "";
-    const q = query(collection(db, "usuarios"));
-    const snapshot = await getDocs(q);
+    const q = db.collection("usuarios");
+    const snapshot = await q.get();
 
     if (snapshot.empty) {
       userList.innerHTML = "<li>Nenhum usuário cadastrado.</li>";
@@ -157,7 +158,7 @@ function initAdminPanel() {
       li.querySelector(".deleteUser").addEventListener("click", async (event) => {
         event.stopPropagation();
         if (confirm(`Excluir usuário ${user.nome}?`)) {
-          await deleteDoc(doc(db, "usuarios", d.id));
+          await db.collection("usuarios").doc(d.id).delete();
           loadAllUsers();
         }
       });
@@ -173,8 +174,9 @@ function initAdminPanel() {
 
   async function setupUserMenu(user) {
     if (!user) return;
-    const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-    if (!userDoc.exists()) return;
+    const userDoc = await db.collection("usuarios").doc(user.uid).get();
+    // CORRIGIDO: de userDoc.exists() para userDoc.exists
+    if (!userDoc.exists) return;
 
     const userData = userDoc.data();
     if (userNameSpan) userNameSpan.textContent = userData.nome;
@@ -182,7 +184,6 @@ function initAdminPanel() {
     if (userInfoContainer) userInfoContainer.style.display = "flex";
   }
 
-  // --- Toggle do dropdown + animação da setinha ---
   const toggleDropdown = (e) => {
     e.stopPropagation();
     if (!userDropdown) return;
@@ -193,7 +194,6 @@ function initAdminPanel() {
   if (userProfileSummary) userProfileSummary.addEventListener("click", toggleDropdown);
   if (userArrow) userArrow.addEventListener("click", toggleDropdown);
 
-  // Fechar ao clicar fora
   document.addEventListener("click", (e) => {
     if (!userDropdown) return;
     const clickInside = userInfoContainer && userInfoContainer.contains(e.target);
@@ -203,7 +203,6 @@ function initAdminPanel() {
     }
   });
 
-  // Fechar com ESC
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && userDropdown?.classList.contains("show")) {
       userDropdown.classList.remove("show");

@@ -1,6 +1,6 @@
-firebase_functions~=0.1.0
 firebase-admin
 firebase-functions
 Pillow
 qrcode
+requests
 google-cloud-storage

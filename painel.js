@@ -1,11 +1,13 @@
-import { auth, db } from "./firebase-config.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { collection, query, where, getDocs, addDoc, doc, deleteDoc, getDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// Nenhum import é necessário aqui
 
 document.addEventListener('DOMContentLoaded', () => {
-    onAuthStateChanged(auth, user => {
-        if (!user) window.location.href = 'login.html';
-        else initPainel(user);
+    // Usa o objeto 'auth' global definido em firebase-config.js
+    auth.onAuthStateChanged(user => {
+        if (!user) {
+            window.location.href = 'login.html';
+        } else {
+            initPainel(user);
+        }
     });
 });
 
@@ -43,8 +45,9 @@ function initPainel(user) {
     // Setup menu do usuário
     async function setupUserMenu(user) {
         if (user) {
-            const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-            if (userDoc.exists()) {
+            const userDoc = await db.collection('usuarios').doc(user.uid).get();
+            // CORRIGIDO: de userDoc.exists() para userDoc.exists
+            if (userDoc.exists) {
                 const userData = userDoc.data();
                 userNameSpan.textContent = userData.nome;
                 userTypeSpan.textContent = userData.tipo;
@@ -62,7 +65,7 @@ function initPainel(user) {
     // Logout
     btnLogout?.addEventListener('click', async (e) => {
         e.preventDefault();
-        await signOut(auth);
+        await auth.signOut();
         window.location.href = 'login.html';
     });
 
@@ -79,9 +82,9 @@ function initPainel(user) {
         eventsErrorDiv.textContent = '';
         if (!nomeEvento) { eventsErrorDiv.textContent = 'Informe um nome para o evento.'; return; }
         try {
-            await addDoc(collection(db, 'eventos'), {
+            await db.collection('eventos').add({
                 nome: nomeEvento,
-                criadoEm: serverTimestamp(),
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
                 criadoPor: auth.currentUser.uid
             });
             newEventNameInput.value = '';
@@ -92,8 +95,8 @@ function initPainel(user) {
     // Carrega eventos do usuário
     async function loadEvents(uid) {
         eventsList.innerHTML = '';
-        const q = query(collection(db, 'eventos'), where('criadoPor', '==', uid), orderBy('criadoEm', 'desc'));
-        const snapshot = await getDocs(q);
+        const q = db.collection('eventos').where('criadoPor', '==', uid).orderBy('criadoEm', 'desc');
+        const snapshot = await q.get();
 
         if (snapshot.empty) {
             eventsList.innerHTML = '<li>Nenhum evento criado ainda.</li>';
@@ -114,7 +117,7 @@ function initPainel(user) {
             li.querySelector('.deleteEvent').addEventListener('click', async (e) => {
                 e.stopPropagation();
                 if (confirm(`Excluir evento ${ev.nome}?`)) {
-                    await deleteDoc(doc(db, 'eventos', d.id));
+                    await db.collection('eventos').doc(d.id).delete();
                     loadEvents(uid);
                 }
             });
@@ -124,7 +127,6 @@ function initPainel(user) {
     }
 
     // Inicializa painel
-    showEventsPanel();
     loadEvents(user.uid);
     setupUserMenu(user);
 }

@@ -1,6 +1,4 @@
-import { auth, db } from "./firebase-config.js";
-import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// Não há mais 'imports' aqui em cima
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
@@ -22,16 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Função para verificar se a entrada é um e-mail válido
     function isEmail(input) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(input);
     }
 
-    // Função para buscar o e-mail do usuário pelo nome de usuário no Firestore
     async function getEmailByUsername(username) {
-        const q = query(collection(db, 'usuarios'), where('nome', '==', username));
-        const snapshot = await getDocs(q);
+        // Usa o objeto 'db' que foi criado no firebase-config.js
+        const q = db.collection('usuarios').where('nome', '==', username);
+        const snapshot = await q.get();
         if (!snapshot.empty) {
             const userDoc = snapshot.docs[0];
             return userDoc.data().email;
@@ -59,20 +56,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Tenta o login com o Firebase Authentication
-                const userCredential = await signInWithEmailAndPassword(auth, emailToLogin, password);
+                // Usa o objeto 'auth' globalmente, através do firebase.auth()
+                const userCredential = await auth.signInWithEmailAndPassword(emailToLogin, password);
                 const user = userCredential.user;
 
-                // Verificação direta para o administrador especial
                 if (user.email === adminEmailSpecial) {
                     window.location.href = 'admin.html';
                     return;
                 }
                 
-                // Consulta o Firestore para obter o tipo de usuário
-                const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+                const userDocRef = db.collection('usuarios').doc(user.uid);
+                const userDoc = await userDocRef.get();
                 
-                if (userDoc.exists()) {
+                if (userDoc.exists) {
                     const userData = userDoc.data();
                     if (userData.tipo === 'administrador') {
                         window.location.href = 'admin.html';
@@ -86,13 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } 
             catch (err) {
                 console.error(err)
-                // Intercepta e traduz os códigos de erro do Firebase
                 if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
                     loginError.textContent = 'Senha incorreta. Por favor, verifique sua senha e tente novamente.';
                 } else if (err.code === 'auth/user-not-found') {
                     loginError.textContent = 'Login incorreto, por favor, verifique seu nome de usuário ou e-mail.';
                 } else {
-                    // Mensagem de erro genérica para outros casos
                     loginError.textContent = 'Ocorreu um erro no login. Por favor, tente novamente.';
                 }
             } 

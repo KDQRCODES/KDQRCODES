@@ -1,8 +1,3 @@
-// Importa as funções necessárias do SDK do Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
 // Configurações do seu projeto Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAiA6yOsbv6gKtTdjeKXWZb3wutx0Ipv4c",
@@ -13,9 +8,7 @@ const firebaseConfig = {
   appId: "1:9325387244:web:7c0e2c03ede84d860d74c9"
 };
 
-// Inicializa o Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-export { auth, db, app };
+// Inicializa o Firebase e cria as constantes para os outros scripts usarem
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();

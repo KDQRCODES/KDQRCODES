@@ -3,23 +3,26 @@ import json
 import io
 import qrcode
 import requests
+import os
 from firebase_admin import credentials, firestore, auth, storage, initialize_app
 from firebase_functions import https_fn
 from google.cloud import storage as gcs_storage
 from PIL import Image, ImageDraw, ImageFont
 
-# Inicializa o Firebase Admin SDK com as credenciais do arquivo
-# É crucial que este arquivo service-account.json tenha as permissões corretas
-cred = credentials.Certificate('service-account.json')
+# --- Bloco de Inicialização ---
+# Usando o arquivo de chave diretamente
+cred_path = 'service-account.json'
+cred = credentials.Certificate(cred_path)
 initialize_app(credential=cred)
 
-# Inicializa as credenciais para o Google Cloud Storage
-gcs_credentials, project = google.auth.load_credentials_from_file('service-account.json')
-gcs_client = gcs_storage.Client(project=project, credentials=gcs_credentials)
-
 db = firestore.client()
+gcs_client = gcs_storage.Client.from_service_account_json(cred_path)
+# --- Fim do Bloco de Inicialização ---
 
-@https_fn.on_request()
+
+
+
+@https_fn.on_request(timeout_sec=300, memory=512)
 def deleteUser(req: https_fn.Request) -> https_fn.Response:
     """
     Função de backend para excluir um usuário do sistema.
@@ -62,7 +65,7 @@ def deleteUser(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(json.dumps(response_data), status=405, headers=headers, mimetype="application/json")
 
 
-@https_fn.on_request()
+@https_fn.on_request(timeout_sec=300, memory=512)
 def generateAndStoreQrCode(req: https_fn.Request) -> https_fn.Response:
     """
     Gera um QR Code para um convidado, salva a imagem no Firebase Storage
@@ -130,7 +133,7 @@ def generateAndStoreQrCode(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(json.dumps(response_data), mimetype="application/json", status=500, headers=headers)
 
 
-@https_fn.on_request()
+@https_fn.on_request(timeout_sec=300, memory=512)
 def generateArt(req: https_fn.Request) -> https_fn.Response:
     """
     Gera a arte do convite mesclando o QR Code com um template de imagem.

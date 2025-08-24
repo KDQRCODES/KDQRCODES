@@ -4,11 +4,10 @@
       "source": "functions",
       "codebase": "default",
       "ignore": [
-        "venv",
+        "node_modules",
         ".git",
         "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
+        "firebase-debug.*.log"
       ],
       "runtime": "python313"
     }

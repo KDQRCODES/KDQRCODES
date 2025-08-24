@@ -20,28 +20,24 @@
             <p class="welcome-submessage">Preencha os dados do novo usuário</p>
         </div>
         
-        <!-- Campo de Nome de Usuário -->
         <div class="input__wrapper">
             <input type="text" id="name" name="name" class="input__field" placeholder="Nome de Usuário" required>
             <label for="name" class="input__label">Nome:</label>
             <i class="fa-solid fa-user input__icon name-icon"></i>
         </div>
 
-        <!-- Campo de Email -->
         <div class="input__wrapper">
             <input type="email" id="email" name="email" class="input__field" placeholder="Email" required>
             <label for="email" class="input__label">Email:</label>
             <i class="fa-solid fa-at input__icon email-icon"></i>
         </div>
         
-        <!-- Campo de Senha -->
         <div class="input__wrapper">
             <input id="password" type="password" class="input__field" placeholder="Senha" required>
             <label for="password" class="input__label">Senha:</label>
             <i class="fa-solid fa-lock input__icon password-icon" id="togglePassword"></i>
         </div>
 
-        <!-- Seleção de Tipo de Usuário -->
         <div class="input__wrapper">
             <label for="userType" class="input__label_select">Tipo de Usuário:</label>
             <select id="userType" class="input__field_select" required>
@@ -57,6 +53,12 @@
         <div id="createError" style="color:red; text-align:center; margin-top: 10px;"></div>
         <div id="createSuccess" style="color:green; text-align:center; margin-top: 10px;"></div>
     </form>
-    <script type="module" src="create.js"></script>
-</body>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    
+    <script src="firebase-config.js"></script>
+    <script src="create.js"></script>
+    </body>
 </html>

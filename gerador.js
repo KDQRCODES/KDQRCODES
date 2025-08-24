@@ -1,20 +1,7 @@
-import { db, auth } from "./firebase-config.js";
-import {
-    collection,
-    query,
-    where,
-    getDocs,
-    addDoc,
-    doc,
-    updateDoc,
-    serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-
+// Nenhum import é necessário aqui
 document.addEventListener('DOMContentLoaded', () => {
-    onAuthStateChanged(auth, user => {
+    // Usa o objeto 'auth' global definido em firebase-config.js
+    auth.onAuthStateChanged(user => {
         if (!user) {
             window.location.href = 'login.html';
         } else {
@@ -38,8 +25,6 @@ async function initGeradorPage(user) {
     const userDropdownLogoutBtn = document.getElementById('btnLogout');
     const mainPanelLink = document.getElementById('mainPanelLink');
 
-    const GENERATE_QR_CODE_FUNCTION_URL = 'https://us-central1-kd-qr-codes-checkin-eventos.cloudfunctions.net/generateAndStoreQrCode';
-
     async function updateNavLinks(userType) {
         if (mainPanelLink) {
             if (userType === 'administrador') {
@@ -54,8 +39,8 @@ async function initGeradorPage(user) {
 
     async function setupUserMenu(user) {
         if (user) {
-            const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-            if (userDoc.exists()) {
+            const userDoc = await db.collection('usuarios').doc(user.uid).get();
+            if (userDoc.exists) {
                 const userData = userDoc.data();
                 if(userNameSpan) userNameSpan.textContent = userData.nome;
                 if(userTypeSpan) userTypeSpan.textContent = userData.tipo;
@@ -66,10 +51,10 @@ async function initGeradorPage(user) {
     }
 
     async function loadEvents() {
+        if (!eventSelection) return;
         eventSelection.innerHTML = '<option value="">Carregando eventos...</option>';
-        const eventosRef = collection(db, 'eventos');
-        const q = query(eventosRef);
-        const querySnapshot = await getDocs(q);
+        const eventosRef = db.collection('eventos');
+        const querySnapshot = await eventosRef.get();
 
         if (querySnapshot.empty) {
             eventSelection.innerHTML = '<option value="">Nenhum evento encontrado</option>';
@@ -89,6 +74,7 @@ async function initGeradorPage(user) {
     loadEvents();
     setupUserMenu(user);
 
+    // Adiciona um evento para o botão de gerar
     btnGerar.addEventListener('click', async () => {
         const eventId = eventSelection.value;
         const nomes = nomesInput.value.split('\n').map(n => n.trim()).filter(n => n.length > 0);
@@ -109,35 +95,23 @@ async function initGeradorPage(user) {
 
         for (const nome of nomes) {
             try {
-                const convidadosRef = collection(db, 'eventos', eventId, 'convidados');
-                const q = query(convidadosRef, where('nome', '==', nome));
-                const exists = await getDocs(q);
+                // Checa se o convidado já existe
+                const convidadosRef = db.collection('eventos').doc(eventId).collection('convidados');
+                const querySnapshot = await convidadosRef.where('nome', '==', nome).get();
 
-                if (exists.empty) {
-                    // 1. Cria o documento do convidado primeiro para ter um ID
-                    const newDocRef = await addDoc(convidadosRef, {
+                if (querySnapshot.empty) {
+                    // Prepara o valor para o QR Code (uma URL com parâmetros)
+                    const qrCodeValue = `https://seusite.com/checkin.html?eventId=${eventId}&nome=${encodeURIComponent(nome)}`;
+                    
+                    // CORRIGIDO: Usa QRCode.toDataURL, que é a forma correta da biblioteca que você está usando
+                    const qrCodeUrl = await QRCode.toDataURL(qrCodeValue);
+                    
+                    // Adiciona o documento do convidado com a URL do QR Code
+                    await convidadosRef.add({
                         nome: nome,
                         checkin: false,
-                        createdAt: serverTimestamp()
-                    });
-
-                    // 2. Chama a Cloud Function para gerar e salvar o QR Code
-                    const qrCodeResponse = await fetch(GENERATE_QR_CODE_FUNCTION_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ eventId, nome })
-                    });
-
-                    if (!qrCodeResponse.ok) {
-                        throw new Error('Falha ao gerar o QR Code.');
-                    }
-
-                    const qrCodeData = await qrCodeResponse.json();
-                    const qrCodeUrl = qrCodeData.public_url;
-
-                    // 3. Atualiza o documento do convidado com a URL do QR Code
-                    await updateDoc(newDocRef, {
-                        qrCode: qrCodeUrl 
+                        qrCode: qrCodeUrl,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
                     const successMsg = document.createElement('p');
@@ -163,13 +137,14 @@ async function initGeradorPage(user) {
         btnGerar.disabled = false;
     });
 
+
     if(userProfileSummary) userProfileSummary.addEventListener('click', () => {
         if(userDropdown) userDropdown.classList.toggle('show');
     });
 
     if(userDropdownLogoutBtn) userDropdownLogoutBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        await signOut(auth);
+        await auth.signOut();
         window.location.href = 'login.html';
     });
 }
