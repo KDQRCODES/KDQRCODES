@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel Admin - Gerenciar Usuários</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* HAMBURGER RESPONSIVO */
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 5px;
+            margin-left: auto;
+        }
+
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: #333;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+
+        .hamburger.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(5px, -5px);
+        }
+
+        @media (max-width: 900px) {
+            nav.menu {
+                display: none;
+                flex-direction: column;
+                background-color: #fff;
+                position: absolute;
+                top: 70px;
+                right: 0;
+                width: 200px;
+                border: 1px solid #ddd;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                z-index: 1000;
+            }
+
+            nav.menu.show {
+                display: flex;
+            }
+
+            nav.menu a {
+                padding: 10px;
+                border-bottom: 1px solid #eee;
+            }
+
+            .hamburger {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="cabecario">
+        <div class="logo-area">
+            <img src="images/LOGO.jpg" alt="KDQRCODES" class="logo-area_image">
+            <div class="logo-area_textos">
+                <h1 class="logo-area_textos__titulo">KD<span class="logo-area_texto__titulo___9">QrCode</span></h1>
+                <h2 class="logo-area_textos__subtitulo">QR Codes inteligentes para momentos inesquecíveis</h2>
+            </div>
+        </div>
+
+        <!-- HAMBURGER -->
+        <div class="hamburger" id="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <nav class="menu" id="mainMenu">
+            <a href="painel.html" id="mainPanelLink" class="mark-page">Painel</a>
+            <a href="gerador.html" id="geradorLink">Gerador de QR Codes</a>
+            <a href="leitor.html" id="leitorLink">Leitor de QR Code</a>
+        </nav>
+
+        <div class="user-info-container">
+            <div class="user-profile-summary" id="userProfileSummary">
+                <i class="fa-solid fa-user-circle user-icon"></i>
+                <span id="userName">Carregando...</span>
+                <span id="userType" class="user-type"></span>
+            </div>
+            <div class="user-dropdown" id="userDropdown">
+                <a href="profile.html" class="dropdown-item">Meu Perfil</a>
+                <a href="#" id="btnLogoutDropdown" class="dropdown-item">Sair</a>
+            </div>
+        </div>
+    </header>
+
+    <h1 class="title-admin">Painel de Administrador</h1>
+    <h2 class="subtitle">Gerenciar Sistema</h2>
+
+    <main id="adminMainPage">
+        <div class="cards-container">
+            <div id="eventsPanel">
+                <h2>Todos os Eventos</h2>
+                <ul id="eventsList"></ul>
+
+                <h2>Criar Novo Evento</h2>
+                <div id="createEvent">
+                    <input type="text" id="newEventName" placeholder="Nome do Evento" />
+                    <button id="btnCreateEvent">Criar Evento</button>
+                </div>
+                <div id="eventsError"></div>
+            </div>
+
+            <div id="usersPanel">
+                <h2>Gerenciar Usuários</h2>
+                <div id="createUserMsg" style="color:green; margin-top: 10px;"></div>
+                <div id="createUserError" style="color:red; margin-top: 10px;"></div>
+                <ul id="userList"></ul>
+                <button id="btnCreateUser">Criar Novo Usuário</button>
+            </div>
+        </div>
+
+        <div id="eventDetails">
+            <button id="btnBackToEvents">← Voltar para eventos</button>
+            <h2 id="eventTitle"></h2>
+            <iframe src="" id="eventIframe"></iframe>
+        </div>
+    </main>
+
+    <script type="module" src="admin.js"></script>
+    <script>
+        // CONTROLAR HAMBURGER
+        const hamburger = document.getElementById('hamburger');
+        const mainMenu = document.getElementById('mainMenu');
+        hamburger.addEventListener('click', () => {
+            mainMenu.classList.toggle('show');
+            hamburger.classList.toggle('active');
+        });
+
+        // Fecha menu se clicar fora
+        document.addEventListener('click', (e) => {
+            const header = document.querySelector('header.cabecario');
+            if (!header.contains(e.target) && mainMenu.classList.contains('show')) {
+                mainMenu.classList.remove('show');
+                hamburger.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel do Evento</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+</head>
+
+<body id="painelEventoPage">
+    <div class="main-container">
+        <div class="page-header">
+            <a href="painel.html" class="back-button">← Voltar</a>
+            <h1 class="title" id="eventTitle">Carregando Evento...</h1>
+        </div>
+
+        <section class="info-painel">
+            <div class="data-evento">
+                <h3>Data do Evento:</h3>
+                <span id="eventDate">Não definido</span>
+                <button id="btnEditDate" class="edit-button" title="Editar Data do Evento">✏️</button>
+            </div>
+            <div class="info-detalhes">
+                <p>Criado por: <span id="eventCreatorName">...</span></p>
+                <p>Criado em: <span id="eventCreatedAt">...</span></p>
+            </div>
+        </section>
+
+        <section class="upload-painel">
+            <h2>Upload de Arte para o Evento</h2>
+            <p class="section-subtitle">Envie uma imagem de template para os convites.</p>
+            <div id="artPreviewContainer" class="art-preview-container" style="display:none;">
+                <img id="artPreview" src="" alt="Arte do Evento" class="art-preview">
+                <button id="btnDeleteArt" class="delete-button">Excluir Arte</button>
+                <div id="artUploadStatus"></div>
+            </div>
+            <div id="artUploadContainer" class="upload-area">
+                <input type="file" id="artFileInput" accept="image/png, image/jpeg" style="display: none;">
+                <button id="btnSelectArt" class="my-form__button">Selecionar Imagem</button>
+                <p id="artFileName" class="muted"></p>
+                <button id="btnUploadArt" class="my-form__button" style="display:none;">Fazer Upload</button>
+                <div id="uploadStatus"></div>
+            </div>
+        </section>
+
+        <section class="entradas-painel">
+            <h2>Lista de Convidados</h2>
+            <div class="list-container">
+                <div class="list-column">
+                    <h3>Confirmados (<span id="confirmedCount">0</span>)</h3>
+                    <ul id="confirmedList" class="convidados-list"></ul>
+                </div>
+                <div class="list-column">
+                    <h3>Pendentes (<span id="pendingCount">0</span>)</h3>
+                    <ul id="pendingList" class="convidados-list"></ul>
+                </div>
+                <div class="export-all-container">
+                    <div id="exportControls" style="display:none;">
+                        <button id="btnCancelExport" class="delete-button">Cancelar Exportação</button>
+                        <div id="exportStatus" class="muted" style="margin-top: 10px;"></div>
+                    </div>
+                    <button id="btnExportAll" class="my-form__button">Exportar Todos os Convites (.zip)</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="qrcodeDisplay" class="qrcode-modal">
+        <div class="qrcode-modal-content">
+            <span class="close-button" id="closeQrcodeModal">&times;</span>
+            <h3>QR Code do Convidado</h3>
+            <p id="guestNameDisplay"></p>
+            <div id="qrcodeImageContainer"></div>
+            <div class="modal-buttons-container">
+                <button id="downloadFullArtBtn" class="my-form__button">Baixar Arte</button>
+                <button id="downloadQrcodeOnlyBtn" class="my-form__button">Baixar apenas o QR Code</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module" src="painel-evento.js"></script>
+    <script type="module" src="router.js"></script>
+</body>
+</html>

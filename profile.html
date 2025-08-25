@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meu Perfil</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body id="rofilePage">
+    <div class="main-container">
+        <div class="page-header">
+            <a href="painel.html" class="back-button">← Voltar</a>
+            <h1 class="title">Meu Perfil</h1>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-info">
+                <i class="fa-solid fa-user-circle profile-icon"></i>
+                <p>Nome: <span id="currentName">Carregando...</span></p>
+                <p>Email: <span id="currentEmail">Carregando...</span></p>
+                <p>Tipo de Usuário: <span id="currentUserType">Carregando...</span></p>
+            </div>
+        </div>
+
+        <div class="profile-card">
+            <h2>Atualizar Nome</h2>
+            <form id="updateNameForm">
+                <div class="input__wrapper">
+                    <input type="text" id="newName" class="input__field" placeholder="Novo Nome" required>
+                    <label for="newName" class="input__label">Novo Nome:</label>
+                </div>
+                <button type="submit" class="my-form__button">Atualizar Nome</button>
+                <div id="nameMessage"></div>
+            </form>
+        </div>
+
+        <div class="profile-card">
+            <h2>Atualizar Senha</h2>
+            <form id="updatePasswordForm">
+                <div class="input__wrapper">
+                    <input type="password" id="currentPassword" class="input__field" placeholder="Senha Atual" required>
+                    <label for="currentPassword" class="input__label">Senha Atual:</label>
+                </div>
+                <div class="input__wrapper">
+                    <input type="password" id="newPassword" class="input__field" placeholder="Nova Senha (min. 6 caracteres)" required>
+                    <label for="newPassword" class="input__label">Nova Senha:</label>
+                </div>
+                <button type="submit" class="my-form__button">Atualizar Senha</button>
+                <div id="passwordMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="profile.js"></script>
+    <script type="module" src="firebase-config.js"></script>
+</body>
+</html>

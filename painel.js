@@ -1,0 +1,141 @@
+import { auth, db } from "./firebase-config.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { collection, query, where, getDocs, addDoc, doc, deleteDoc, getDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+document.addEventListener('DOMContentLoaded', () => {
+    onAuthStateChanged(auth, user => {
+        if (!user) window.location.href = 'login.html';
+        else initPainel(user);
+    });
+});
+
+function initPainel(user) {
+    const eventsPanel = document.getElementById('eventsPanel');
+    const btnLogout = document.getElementById('btnLogout');
+    const eventsList = document.getElementById('eventsList');
+    const newEventNameInput = document.getElementById('newEventName');
+    const btnCreateEvent = document.getElementById('btnCreateEvent');
+    const eventsErrorDiv = document.getElementById('eventsError');
+    const eventDetails = document.getElementById('eventDetails');
+    const eventIframe = document.getElementById('eventIframe');
+    const btnBackToEvents = document.getElementById('btnBackToEvents');
+
+    const userProfileSummary = document.getElementById('userProfileSummary');
+    const userDropdown = document.getElementById('userDropdown');
+    const userNameSpan = document.getElementById('userName');
+    const userTypeSpan = document.getElementById('userType');
+    const userInfoContainer = document.querySelector('.user-info-container');
+    const mainPanelLink = document.getElementById('mainPanelLink');
+    const menuToggle = document.getElementById('menuToggle');
+    const mainMenu = document.getElementById('mainMenu');
+
+    // Mostrar painel e detalhes
+    function showEventsPanel() { eventsPanel.style.display = 'block'; eventDetails.style.display = 'none'; }
+    function showEventDetails() { eventsPanel.style.display = 'none'; eventDetails.style.display = 'flex'; }
+
+    // Atualiza links de navegação
+    async function updateNavLinks(userType) {
+        if (mainPanelLink) {
+            if (userType === 'administrador') {
+                mainPanelLink.textContent = 'Painel de Administrador';
+                mainPanelLink.href = 'admin.html';
+            } else {
+                mainPanelLink.textContent = 'Painel de Check-in';
+                mainPanelLink.href = 'painel.html';
+            }
+        }
+    }
+
+    // Setup menu do usuário
+    async function setupUserMenu(user) {
+        if (user) {
+            const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                userNameSpan.textContent = userData.nome;
+                userTypeSpan.textContent = userData.tipo;
+                userInfoContainer.style.display = 'flex';
+                updateNavLinks(userData.tipo);
+            }
+        }
+    }
+
+    // Dropdown do usuário
+    userProfileSummary?.addEventListener('click', () => {
+        userDropdown.classList.toggle('show');
+    });
+
+    // Menu toggle mobile
+    menuToggle?.addEventListener('click', () => {
+        if (mainMenu) mainMenu.classList.toggle('show');
+    });
+
+    // Logout
+    btnLogout?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await signOut(auth);
+        window.location.href = 'login.html';
+    });
+
+    // Voltar para eventos
+    btnBackToEvents?.addEventListener('click', () => {
+        eventIframe.src = '';
+        showEventsPanel();
+        loadEvents(user.uid);
+    });
+
+    // Criar evento
+    btnCreateEvent?.addEventListener('click', async () => {
+        const nomeEvento = newEventNameInput.value.trim();
+        eventsErrorDiv.textContent = '';
+        if (!nomeEvento) { eventsErrorDiv.textContent = 'Informe um nome para o evento.'; return; }
+        try {
+            await addDoc(collection(db, 'eventos'), {
+                nome: nomeEvento,
+                criadoEm: serverTimestamp(),
+                criadoPor: auth.currentUser.uid
+            });
+            newEventNameInput.value = '';
+            loadEvents(auth.currentUser.uid);
+        } catch (err) { eventsErrorDiv.textContent = 'Erro ao criar evento: ' + err.message; }
+    });
+
+    // Carrega eventos do usuário
+    async function loadEvents(uid) {
+        eventsList.innerHTML = '';
+        const q = query(collection(db, 'eventos'), where('criadoPor', '==', uid), orderBy('criadoEm', 'desc'));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            eventsList.innerHTML = '<li>Nenhum evento criado ainda.</li>';
+            return;
+        }
+
+        snapshot.forEach(d => {
+            const ev = d.data();
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${ev.nome}</span>
+                            <button class="deleteEvent" data-event-id="${d.id}">Excluir</button>`;
+            li.dataset.id = d.id;
+
+            li.addEventListener('click', () => {
+                window.location.href = `painel-evento.html?eventId=${d.id}`;
+            });
+
+            li.querySelector('.deleteEvent').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm(`Excluir evento ${ev.nome}?`)) {
+                    await deleteDoc(doc(db, 'eventos', d.id));
+                    loadEvents(uid);
+                }
+            });
+
+            eventsList.appendChild(li);
+        });
+    }
+
+    // Inicializa painel
+    showEventsPanel();
+    loadEvents(user.uid);
+    setupUserMenu(user);
+}

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerador de QR Codes</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+</head>
+
+<body id="geradorPage">
+    <header class="cabecario">
+        <div class="logo-area">
+            <img src="images/LOGO.jpg" alt="KDQRCODES" class="logo-area_image">
+            <div class="logo-area_textos">
+                <h1 class="logo-area_textos__titulo">KD<span class="logo-area_texto__titulo___9">QrCode</span></h1>
+                <h2 class="logo-area_textos__subtitulo">QR Codes inteligentes para momentos inesquecíveis</h2>
+            </div>
+        </div>
+
+        <nav class="menu" id="mainMenu">
+            <a href="painel.html" id="mainPanelLink">Painel</a>
+            <a href="#" id="geradorLink" class="mark-page">Gerador de QR Codes</a>
+            <a href="leitor.html" id="leitorLink">Leitor de QR Code</a>
+        </nav>
+
+        <div class="user-info-container">
+            <div class="user-profile-summary" id="userProfileSummary">
+                <i class="fa-solid fa-user-circle user-icon"></i>
+                <span id="userName">Carregando...</span>
+                <span id="userType" class="user-type"></span>
+            </div>
+            <div class="user-dropdown" id="userDropdown">
+                <a href="profile.html" class="dropdown-item">Meu Perfil</a>
+                <a href="#" id="btnLogout" class="dropdown-item">Sair</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-gerador">
+        <h1 class="title">Gerador de QR Codes</h1>
+
+        <section class="gerador-painel">
+            <h2>Selecione o Evento</h2>
+            <div class="select-event-container">
+                <select id="eventSelection" class="my-form__select">
+                    <option value="">Carregando eventos...</option>
+                </select>
+            </div>
+
+            <h2>Adicionar Convidados</h2>
+            <p class="section-subtitle">Digite um nome por linha para adicionar os convidados ao evento.</p>
+            <textarea id="nomesInput" rows="10" placeholder="Ex.:&#10;João da Silva&#10;Maria Souza"></textarea>
+            <button id="btnGerar" class="my-form__button">Adicionar Convidados</button>
+            <div id="geradorStatus"></div>
+            <div id="qrcodes-container" class="qrcodes-list"></div>
+        </section>
+    </div>
+    <script type="module" src="gerador.js"></script>
+    <script type="module" src="firebase-config.js"></script>
+</body>
+</html>
