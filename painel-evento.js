@@ -1,5 +1,3 @@
-// Nenhum import é necessário aqui
-
 document.addEventListener('DOMContentLoaded', () => {
     // Usa o objeto 'auth' global definido em firebase-config.js
     auth.onAuthStateChanged(user => {
@@ -84,6 +82,7 @@ function initPainelEvento(user) {
             if(btnUploadArt) btnUploadArt.style.display = 'none';
         }
     }
+
 
     async function loadEventDetails() {
         const docRef = db.collection('eventos').doc(eventId);
@@ -481,21 +480,86 @@ function initPainelEvento(user) {
     });
 
 
-    db.collection('eventos').doc(eventId).collection('convidados').onSnapshot(snapshot => {
-        const convidados = [];
-        snapshot.forEach(d => convidados.push({ id: d.id, ...d.data() }));
+    // Este código substitui todas as suas funções de renderização
+    // e o listener onSnapshot anterior.
 
+    function renderGuestLists(convidados) {
         const confirmados = convidados.filter(c => c.checkin === true);
         const pendentes = convidados.filter(c => c.checkin === false || !c.hasOwnProperty('checkin'));
 
-        allPendingGuests = pendentes;
+        allPendingGuests = pendentes; // Atualiza a lista global de pendentes
 
         if(confirmedCountEl) confirmedCountEl.textContent = confirmados.length;
         if(pendingCountEl) pendingCountEl.textContent = pendentes.length;
 
-        renderList(confirmedListEl, confirmados.slice(0, MAX_ITEMS), confirmados.length, true);
-        renderPendingList(pendentes.slice(0, MAX_ITEMS));
+        function createAndAppendListItem(list, guest, isConfirmed) {
+            const li = document.createElement('li');
+            if (isConfirmed) {
+                li.textContent = `${guest.nome} - ${guest.checkinAt?.toDate ? guest.checkinAt.toDate().toLocaleString() : '—'}`;
+                li.classList.add('confirmed-item');
+            } else {
+                li.textContent = guest.nome;
+                li.classList.add('pending-item');
+                li.addEventListener('click', () => displayArtModal(guest));
+            }
+            list.appendChild(li);
+        }
 
+        // Renderiza a lista de convidados confirmados
+        confirmedListEl.innerHTML = '';
+        if (confirmados.length === 0) {
+            confirmedListEl.innerHTML = '<li class="muted">Nenhum check-in confirmado ainda.</li>';
+        } else {
+            const confirmedToShow = confirmados.slice(0, MAX_ITEMS);
+            confirmedToShow.forEach(guest => createAndAppendListItem(confirmedListEl, guest, true));
+            if (confirmados.length > MAX_ITEMS) {
+                const btn = document.createElement('button');
+                btn.textContent = `Mostrar todos os ${confirmados.length}`;
+                btn.className = 'show-all-btn';
+                btn.onclick = () => {
+                    confirmedListEl.innerHTML = '';
+                    confirmedGuests.forEach(guest => createAndAppendListItem(confirmedListEl, guest, true));
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = 'Mostrar menos';
+                    closeBtn.className = 'show-all-btn';
+                    closeBtn.onclick = () => location.reload();
+                    confirmedListEl.appendChild(closeBtn);
+                };
+                confirmedListEl.appendChild(btn);
+            }
+        }
+
+        // Renderiza a lista de convidados pendentes
+        pendingListEl.innerHTML = '';
+        if (pendentes.length === 0) {
+            pendingListEl.innerHTML = '<li class="muted">Todos os convidados chegaram!</li>';
+        } else {
+            const pendingToShow = pendentes.slice(0, MAX_ITEMS);
+            pendingToShow.forEach(guest => createAndAppendListItem(pendingListEl, guest, false));
+            if (pendentes.length > MAX_ITEMS) {
+                const btn = document.createElement('button');
+                btn.textContent = `Mostrar todos os ${pendentes.length}`;
+                btn.className = 'show-all-btn';
+                btn.onclick = () => {
+                    pendingListEl.innerHTML = '';
+                    pendentes.forEach(guest => createAndAppendListItem(pendingListEl, guest, false));
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = 'Mostrar menos';
+                    closeBtn.className = 'show-all-btn';
+                    closeBtn.onclick = () => location.reload();
+                    pendingListEl.appendChild(closeBtn);
+                };
+                pendingListEl.appendChild(btn);
+            }
+        }
+    }
+
+    // O NOVO listener onSnapshot, que agora chama a nova função
+    db.collection('eventos').doc(eventId).collection('convidados').onSnapshot(snapshot => {
+        const convidados = [];
+        snapshot.forEach(d => convidados.push({ id: d.id, ...d.data() }));
+        renderGuestLists(convidados);
+        
         if (convidados.length > 0 && btnExportAll) {
             btnExportAll.style.display = 'block';
         } else if(btnExportAll) {
@@ -503,86 +567,13 @@ function initPainelEvento(user) {
         }
     });
 
-    function renderList(listElement, data, totalCount, isConfirmed) {
-        if(!listElement) return;
-        listElement.innerHTML = '';
-
-        if (data.length === 0) {
-            const message = isConfirmed ? 'Nenhum check-in confirmado ainda.' : 'Todos os convidados chegaram!';
-            listElement.innerHTML = `<li class="muted">${message}</li>`;
-        } else {
-            data.forEach(c => {
-                const li = document.createElement('li');
-                if (isConfirmed) {
-                    li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
-                    li.classList.add('confirmed-item');
-                } else {
-                    li.textContent = c.nome;
-                    li.classList.add('pending-item');
-                    li.addEventListener('click', () => displayArtModal(c));
-                }
-                listElement.appendChild(li);
-            });
-        }
-
-        if (totalCount > MAX_ITEMS) {
-            const btn = document.createElement('button');
-            btn.textContent = `Mostrar todos os ${totalCount}`;
-            btn.className = 'show-all-btn';
-            btn.onclick = () => {
-                const fullData = isConfirmed ? convidados.filter(c => c.checkin) : allPendingGuests;
-                renderFullList(listElement, fullData, isConfirmed);
-            };
-            listElement.appendChild(btn);
-        }
-    }
-
-    function renderFullList(listElement, data, isConfirmed = false) {
-        if(!listElement) return;
-        listElement.innerHTML = '';
-        data.forEach(c => {
-            const li = document.createElement('li');
-            if (isConfirmed) {
-                li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
-                li.classList.add('confirmed-item');
-            } else {
-                li.textContent = c.nome;
-                li.classList.add('pending-item');
-                li.addEventListener('click', () => displayArtModal(c));
-            }
-            listElement.appendChild(li);
-        });
-        const btn = document.createElement('button');
-        btn.textContent = `Mostrar menos`;
-        btn.className = 'show-all-btn';
-        btn.onclick = () => { location.reload(); };
-        listElement.appendChild(btn);
-    }
-
-    function renderPendingList(data) {
-        if(!pendingListEl) return;
-        pendingListEl.innerHTML = '';
-
-        if (data.length === 0) {
-            pendingListEl.innerHTML = '<li class="muted">Nenhum convidado encontrado.</li>';
-        } else {
-            data.forEach(c => {
-                const li = document.createElement('li');
-                li.textContent = c.nome;
-                li.classList.add('pending-item');
-                li.addEventListener('click', () => displayArtModal(c));
-                pendingListEl.appendChild(li);
-            });
-        }
-    }
-
     if(searchPendingGuestsInput) {
         searchPendingGuestsInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             const filteredGuests = allPendingGuests.filter(guest => 
                 guest.nome.toLowerCase().includes(searchTerm)
             );
-            renderPendingList(filteredGuests);
+            renderGuestLists(filteredGuests);
         });
     }
 
@@ -593,83 +584,4 @@ function initPainelEvento(user) {
         if(exportControls) exportControls.style.display = 'none';
         if(btnExportAll) btnExportAll.style.display = 'block';
     });
-
-
-    db.collection('eventos').doc(eventId).collection('convidados').onSnapshot(snapshot => {
-        const convidados = [];
-        snapshot.forEach(d => convidados.push({ id: d.id, ...d.data() }));
-
-        const confirmados = convidados.filter(c => c.checkin === true);
-        const pendentes = convidados.filter(c => c.checkin === false || !c.hasOwnProperty('checkin'));
-
-        allPendingGuests = pendentes;
-
-        if(confirmedCountEl) confirmedCountEl.textContent = confirmados.length;
-        if(pendingCountEl) pendingCountEl.textContent = pendentes.length;
-
-        renderList(confirmedListEl, confirmados.slice(0, MAX_ITEMS), confirmados.length, true);
-        renderPendingList(pendentes.slice(0, MAX_ITEMS));
-
-        if (convidados.length > 0 && btnExportAll) {
-            btnExportAll.style.display = 'block';
-        } else if(btnExportAll) {
-            btnExportAll.style.display = 'none';
-        }
-    });
-
-    function renderList(listElement, data, totalCount, isConfirmed) {
-        if(!listElement) return;
-        listElement.innerHTML = '';
-
-        if (data.length === 0) {
-            const message = isConfirmed ? 'Nenhum check-in confirmado ainda.' : 'Todos os convidados chegaram!';
-            listElement.innerHTML = `<li class="muted">${message}</li>`;
-        } else {
-            data.forEach(c => {
-                const li = document.createElement('li');
-                if (isConfirmed) {
-                    li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
-                    li.classList.add('confirmed-item');
-                } else {
-                    li.textContent = c.nome;
-                    li.classList.add('pending-item');
-                    li.addEventListener('click', () => displayArtModal(c));
-                }
-                listElement.appendChild(li);
-            });
-        }
-
-        if (totalCount > MAX_ITEMS) {
-            const btn = document.createElement('button');
-            btn.textContent = `Mostrar todos os ${totalCount}`;
-            btn.className = 'show-all-btn';
-            btn.onclick = () => {
-                const fullData = isConfirmed ? convidados.filter(c => c.checkin) : allPendingGuests;
-                renderFullList(listElement, fullData, isConfirmed);
-            };
-            listElement.appendChild(btn);
-        }
-    }
-
-    function renderFullList(listElement, data, isConfirmed = false) {
-        if(!listElement) return;
-        listElement.innerHTML = '';
-        data.forEach(c => {
-            const li = document.createElement('li');
-            if (isConfirmed) {
-                li.textContent = `${c.nome} - ${c.checkinAt?.toDate ? c.checkinAt.toDate().toLocaleString() : '—'}`;
-                li.classList.add('confirmed-item');
-            } else {
-                li.textContent = c.nome;
-                li.classList.add('pending-item');
-                li.addEventListener('click', () => displayArtModal(c));
-            }
-            listElement.appendChild(li);
-        });
-        const btn = document.createElement('button');
-        btn.textContent = `Mostrar menos`;
-        btn.className = 'show-all-btn';
-        btn.onclick = () => { location.reload(); };
-        listElement.appendChild(btn);
-    }
 }
