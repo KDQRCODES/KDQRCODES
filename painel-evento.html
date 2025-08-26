@@ -54,6 +54,15 @@
                 </div>
                 <div class="list-column">
                     <h3>Pendentes (<span id="pendingCount">0</span>)</h3>
+                    
+                    <div class="search-container">
+                        <input type="text" id="searchPendingGuests" placeholder="Pesquisar convidados..." class="search-input" />
+                        <button id="btnSearchGuests" class="search-button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+
+                    
                     <ul id="pendingList" class="convidados-list"></ul>
                 </div>
                 <div class="export-all-container">
@@ -66,7 +75,7 @@
             </div>
         </section>
     </div>
-
+    
     <div id="qrcodeDisplay" class="qrcode-modal">
         <div class="qrcode-modal-content">
             <span class="close-button" id="closeQrcodeModal">&times;</span>
@@ -76,6 +85,7 @@
             <div class="modal-buttons-container">
                 <button id="downloadFullArtBtn" class="my-form__button">Baixar Arte</button>
                 <button id="downloadQrcodeOnlyBtn" class="my-form__button">Baixar apenas o QR Code</button>
+                <button id="btnDeleteGuest" class="delete-button">Excluir</button>
             </div>
         </div>
     </div>

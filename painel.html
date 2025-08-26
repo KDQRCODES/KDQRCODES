@@ -18,11 +18,6 @@
             </div>
         </div>
 
-        <!-- Botão para mobile -->
-        <div class="menu-toggle" id="menuToggle">
-            <i class="fa-solid fa-bars"></i>
-        </div>
-
         <nav class="menu" id="mainMenu">
             <a href="painel.html" id="mainPanelLink" class="mark-page">Painel</a>
             <a href="gerador.html" id="geradorLink">Gerador de QR Codes</a>
@@ -42,7 +37,18 @@
             </div>
         </div>
 
+        <!-- HAMBURGER -->
+        <div class="hamburger" id="hamburger">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
     </header>
+
+    <div class="menu-hamburger" id="menuHamburger">
+        <a href="gerador.html" id="geradorLink">Gerador de QR Codes</a>
+        <a href="leitor.html" id="leitorLink">Leitor de QR Code</a>
+    </div>
 
     <main id="painelPage">
         <h1 class="title-painel">Painel de Check-in</h1>
@@ -59,15 +65,28 @@
                 </div>
                 <div id="eventsError"></div>
             </div>
-
-            <div id="eventDetails">
-                <button id="btnBackToEvents">← Voltar para eventos</button>
-                <h2 id="eventTitle"></h2>
-                <iframe src="" id="eventIframe"></iframe>
-            </div>
         </div>
     </main>
 
     <script type="module" src="painel.js"></script>
+
+    <script>
+        // CONTROLAR HAMBURGER
+        const hamburger = document.getElementById('hamburger');
+        const menuHamburger = document.getElementById('menuHamburger');
+        hamburger.addEventListener('click', () => {
+            menuHamburger.classList.toggle('show');
+            hamburger.classList.toggle('active');
+        });
+
+        // Fecha menu se clicar fora
+        document.addEventListener('click', (e) => {
+            const header = document.querySelector('header.cabecario');
+            if (!header.contains(e.target) && menuHamburger.classList.contains('show')) {
+                menuHamburger.classList.remove('show');
+                hamburger.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>

@@ -137,7 +137,7 @@ async function initGeradorPage(user) {
 
                     // 3. Atualiza o documento do convidado com a URL do QR Code
                     await updateDoc(newDocRef, {
-                        qrCodeUrl: qrCodeUrl
+                        qrCode: qrCodeUrl 
                     });
 
                     const successMsg = document.createElement('p');

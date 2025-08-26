@@ -10,7 +10,8 @@ import {
     onSnapshot,
     orderBy,
     serverTimestamp,
-    updateDoc
+    updateDoc,
+    deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
@@ -31,9 +32,13 @@ const MAX_ITEMS = 10;
 // URL da sua Cloud Function
 const GENERATE_ART_FUNCTION_URL = 'https://us-central1-kd-qr-codes-checkin-eventos.cloudfunctions.net/generateArt';
 
+const searchPendingGuests = document.getElementById('searchPendingGuests');
+
 let artTemplateUrl = null;
 let generatedArtBlob = null;
 let isExportCancelled = false; // NOVO: Flag para cancelamento
+let currentGuestId = null;
+let allPendingGuests = [];
 
 function initPainelEvento(user) {
     const params = new URLSearchParams(window.location.search);
@@ -63,6 +68,7 @@ function initPainelEvento(user) {
     const qrcodeImageContainer = document.getElementById('qrcodeImageContainer');
     const downloadQrcodeOnlyBtn = document.getElementById('downloadQrcodeOnlyBtn');
     const downloadFullArtBtn = document.getElementById('downloadFullArtBtn');
+    const btnDeleteGuest = document.getElementById('btnDeleteGuest');
     
     const artPreviewContainer = document.getElementById('artPreviewContainer');
     const artPreview = document.getElementById('artPreview');
@@ -78,6 +84,8 @@ function initPainelEvento(user) {
     const btnCancelExport = document.getElementById('btnCancelExport');
     const btnExportAll = document.getElementById('btnExportAll');
     const exportStatus = document.getElementById('exportStatus');
+
+    const searchPendingGuestsInput = document.getElementById('searchPendingGuests');
 
     if(backButton) backButton.href = 'painel.html';
     
@@ -205,6 +213,8 @@ function initPainelEvento(user) {
             return;
         }
 
+        currentGuestId = guestData.id;
+
         guestNameDisplay.textContent = guestData.nome;
         qrcodeImageContainer.innerHTML = 'Carregando arte...';
         
@@ -212,6 +222,25 @@ function initPainelEvento(user) {
         downloadQrcodeOnlyBtn.style.display = 'none';
         
         qrcodeDisplay.style.display = 'flex';
+
+        // NOVO: Adiciona o event listener para o botão de exclusão
+        if(btnDeleteGuest) btnDeleteGuest.addEventListener('click', async () => {
+            if (confirm(`Tem certeza que deseja excluir o convidado "${guestNameDisplay.textContent}"?`)) {
+                try {
+                    // Acha o ID do documento do convidado no Firebase
+                    const docRef = doc(db, 'eventos', eventId, 'convidados', currentGuestId);
+                    await deleteDoc(docRef);
+
+                    alert('Convidado excluído com sucesso!');
+                    if(qrcodeDisplay) qrcodeDisplay.style.display = 'none';
+
+                    // O onSnapshot recarregará a lista automaticamente
+                } catch (error) {
+                    alert('Erro ao excluir convidado: ' + error.message);
+                    console.error("Erro ao excluir convidado:", error);
+                }
+            }
+        });
         
         try {
             if (!artTemplateUrl) {
@@ -223,6 +252,7 @@ function initPainelEvento(user) {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                mode: 'cors',
                 body: JSON.stringify({
                     eventId: eventId,
                     nome: guestData.nome
@@ -378,6 +408,14 @@ function initPainelEvento(user) {
         }
     }
 
+    searchPendingGuests.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filteredGuests = allPendingGuests.filter(guest => 
+            guest.nome.toLowerCase().includes(searchTerm)
+        );
+        renderPendingList(filteredGuests);
+    });
+
     if(btnExportAll) btnExportAll.addEventListener('click', exportAllArts);
 
     onSnapshot(collection(db, 'eventos', eventId, 'convidados'), snapshot => {
@@ -385,10 +423,11 @@ function initPainelEvento(user) {
 
         const convidados = [];
         snapshot.forEach(d => convidados.push({ id: d.id, ...d.data() }));
-        
 
         const confirmados = convidados.filter(c => c.checkin === true);
         const pendentes = convidados.filter(c => c.checkin === false || !c.hasOwnProperty('checkin'));
+
+        allPendingGuests = pendentes;
 
         if(confirmedCountEl) confirmedCountEl.textContent = confirmados.length;
         if(pendingCountEl) pendingCountEl.textContent = pendentes.length;
@@ -417,6 +456,8 @@ function initPainelEvento(user) {
             }
         }
 
+        renderPendingList(pendingToDisplay);
+
         if(pendingListEl) {
             pendingListEl.innerHTML = '';
             if (pendingToDisplay.length === 0) {
@@ -444,6 +485,50 @@ function initPainelEvento(user) {
         } else if(btnExportAll) {
             btnExportAll.style.display = 'none';
         }
+
+         if (pendentes.length > MAX_ITEMS) {
+            const btn = document.createElement('button');
+            btn.textContent = `Mostrar todos os ${pendentes.length} pendentes`;
+            btn.className = 'show-all-btn';
+            if(btn) btn.onclick = () => { renderFullList(pendingListEl, pendentes); };
+            pendingListEl.appendChild(btn);
+        }
+
+        function renderPendingList(data) {
+            if(pendingListEl) {
+                pendingListEl.innerHTML = '';
+                if (data.length === 0) {
+                    pendingListEl.innerHTML = '<li class="muted">Nenhum convidado encontrado.</li>';
+                } else {
+                    data.forEach(c => {
+                        const li = document.createElement('li');
+                        li.textContent = c.nome;
+                        li.classList.add('pending-item');
+                        if(li) li.addEventListener('click', () => displayArtModal(c));
+                        pendingListEl.appendChild(li);
+                    });
+                }
+            }
+        }
+
+        // NOVO: Event listener para o botão de pesquisa
+        if(btnSearchGuests) btnSearchGuests.addEventListener('click', () => {
+            const searchTerm = searchPendingGuestsInput.value.toLowerCase().trim();
+            const filteredGuests = allPendingGuests.filter(guest => 
+                guest.nome.toLowerCase().includes(searchTerm)
+            );
+            // NOVO: Renderiza a lista filtrada
+            renderPendingList(filteredGuests);
+        });
+
+        // NOVO: Event listener para o input de pesquisa (atualização em tempo real)
+        if(searchPendingGuestsInput) searchPendingGuestsInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const filteredGuests = allPendingGuests.filter(guest => 
+                guest.nome.toLowerCase().includes(searchTerm)
+            );
+            renderPendingList(filteredGuests);
+        });
     });
     
     function renderFullList(listElement, data, isConfirmed = false) {
@@ -477,6 +562,10 @@ function initPainelEvento(user) {
         if(exportControls) exportControls.style.display = 'none';
         if(btnExportAll) btnExportAll.style.display = 'block';
     });
+
+    function renderPendingList(convidados) {
+        // Limpar a lista e renderizar os itens filtrados
+    }
 
 
     async function exportAllArts() {

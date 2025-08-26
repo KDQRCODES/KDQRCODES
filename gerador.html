@@ -30,13 +30,26 @@
                 <i class="fa-solid fa-user-circle user-icon"></i>
                 <span id="userName">Carregando...</span>
                 <span id="userType" class="user-type"></span>
+                <i class="fa-solid fa-chevron-down user-arrow" id="userArrow"></i>
             </div>
             <div class="user-dropdown" id="userDropdown">
                 <a href="profile.html" class="dropdown-item">Meu Perfil</a>
                 <a href="#" id="btnLogout" class="dropdown-item">Sair</a>
             </div>
         </div>
+
+        <!-- HAMBURGER -->
+        <div class="hamburger" id="hamburger">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
     </header>
+
+    <div class="menu-hamburger" id="menuHamburger">
+        <a href="painel.html" id="mainPanelLink">Painel</a>
+        <a href="leitor.html" id="leitorLink">Leitor de QR Code</a>
+    </div>
 
     <div class="main-gerador">
         <h1 class="title">Gerador de QR Codes</h1>
@@ -59,5 +72,24 @@
     </div>
     <script type="module" src="gerador.js"></script>
     <script type="module" src="firebase-config.js"></script>
+
+    <script>
+        // CONTROLAR HAMBURGER
+        const hamburger = document.getElementById('hamburger');
+        const menuHamburger = document.getElementById('menuHamburger');
+        hamburger.addEventListener('click', () => {
+            menuHamburger.classList.toggle('show');
+            hamburger.classList.toggle('active');
+        });
+
+        // Fecha menu se clicar fora
+        document.addEventListener('click', (e) => {
+            const header = document.querySelector('header.cabecario');
+            if (!header.contains(e.target) && menuHamburger.classList.contains('show')) {
+                menuHamburger.classList.remove('show');
+                hamburger.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>

@@ -21,20 +21,33 @@
         <nav class="menu" id="mainMenu">
             <a href="painel.html">Painel de Check-in</a>
             <a href="gerador.html">Gerador de QR Codes</a>
-            <a href="leitor.html" class="mark-page">Leitor de QR Code</a>
+            <a href="#" class="mark-page">Leitor de QR Code</a>
         </nav>
         <div class="user-info-container">
             <div class="user-profile-summary" id="userProfileSummary">
                 <i class="fa-solid fa-user-circle user-icon"></i>
                 <span id="userName">Carregando...</span>
                 <span id="userType" class="user-type"></span>
+                <i class="fa-solid fa-chevron-down user-arrow" id="userArrow"></i>
             </div>
             <div class="user-dropdown" id="userDropdown">
                 <a href="profile.html" class="dropdown-item">Meu Perfil</a>
                 <a href="#" id="btnLogout" class="dropdown-item">Sair</a>
             </div>
         </div>
+
+        <!-- HAMBURGER -->
+        <div class="hamburger" id="hamburger">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
     </header>
+
+    <div class="menu-hamburger" id="menuHamburger">
+        <a href="painel.html" id="mainPanelLink">Painel</a>
+        <a href="gerador.html" id="geradorLink">Gerador de QR Codes</a>
+    </div>
 
     <h1 class="title">Leitor de QR Code</h1>
     <div class="leitor-content-container">
@@ -60,5 +73,24 @@
 
     <script type="module" src="leitor.js"></script>
     <script type="module" src="firebase-config.js"></script>
+
+    <script>
+        // CONTROLAR HAMBURGER
+        const hamburger = document.getElementById('hamburger');
+        const menuHamburger = document.getElementById('menuHamburger');
+        hamburger.addEventListener('click', () => {
+            menuHamburger.classList.toggle('show');
+            hamburger.classList.toggle('active');
+        });
+
+        // Fecha menu se clicar fora
+        document.addEventListener('click', (e) => {
+            const header = document.querySelector('header.cabecario');
+            if (!header.contains(e.target) && menuHamburger.classList.contains('show')) {
+                menuHamburger.classList.remove('show');
+                hamburger.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>

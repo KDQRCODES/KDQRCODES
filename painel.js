@@ -16,7 +16,6 @@ function initPainel(user) {
     const newEventNameInput = document.getElementById('newEventName');
     const btnCreateEvent = document.getElementById('btnCreateEvent');
     const eventsErrorDiv = document.getElementById('eventsError');
-    const eventDetails = document.getElementById('eventDetails');
     const eventIframe = document.getElementById('eventIframe');
     const btnBackToEvents = document.getElementById('btnBackToEvents');
 
@@ -26,12 +25,7 @@ function initPainel(user) {
     const userTypeSpan = document.getElementById('userType');
     const userInfoContainer = document.querySelector('.user-info-container');
     const mainPanelLink = document.getElementById('mainPanelLink');
-    const menuToggle = document.getElementById('menuToggle');
     const mainMenu = document.getElementById('mainMenu');
-
-    // Mostrar painel e detalhes
-    function showEventsPanel() { eventsPanel.style.display = 'block'; eventDetails.style.display = 'none'; }
-    function showEventDetails() { eventsPanel.style.display = 'none'; eventDetails.style.display = 'flex'; }
 
     // Atualiza links de navegação
     async function updateNavLinks(userType) {
@@ -63,11 +57,6 @@ function initPainel(user) {
     // Dropdown do usuário
     userProfileSummary?.addEventListener('click', () => {
         userDropdown.classList.toggle('show');
-    });
-
-    // Menu toggle mobile
-    menuToggle?.addEventListener('click', () => {
-        if (mainMenu) mainMenu.classList.toggle('show');
     });
 
     // Logout
