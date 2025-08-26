@@ -1,6 +1,6 @@
 import { db, auth } from "./firebase-config.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { doc, getDoc, updateDoc, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { doc, getDoc, updateDoc, collection, query, getDocs, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     onAuthStateChanged(auth, user => {
@@ -100,22 +100,30 @@ async function initLeitorPage(user) {
                 showStatus('QR Code não pertence a este evento!', 'error');
                 return;
             }
+            
+            // NOVO: Faz uma consulta por nome, em vez de usar o nome como ID
+            const convidadosRef = collection(db, 'eventos', eventId, 'convidados');
+            const q = query(convidadosRef, where('nome', '==', nome));
+            const querySnapshot = await getDocs(q);
 
-            const convidadoRef = doc(db, 'eventos', eventId, 'convidados', nome);
-            const convidadoDoc = await getDoc(convidadoRef);
-
-            if (!convidadoDoc.exists()) {
+            if (querySnapshot.empty) {
                 showStatus(`Convidado "${nome}" não encontrado.`, 'error');
                 return;
             }
 
+            // Pega o primeiro documento encontrado (assumindo que os nomes são únicos)
+            const convidadoDoc = querySnapshot.docs[0];
+            const convidadoRef = convidadoDoc.ref;
             const convidadoData = convidadoDoc.data();
 
             if (convidadoData.checkin) {
                 showStatus(`"${nome}" já fez check-in.`, 'error');
             } else {
                 if (!isTestMode) {
-                    await updateDoc(convidadoRef, { checkin: true });
+                    await updateDoc(convidadoRef, { 
+                        checkin: true,
+                        checkinAt: serverTimestamp() // ADICIONADO: Para registrar a data e hora do check-in
+                    });
                 }
                 showStatus(`✅ Check-in de "${nome}" realizado com sucesso!`, 'success');
             }
